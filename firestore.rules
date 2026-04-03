@@ -1,0 +1,119 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+    
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+    
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser() {
+      let data = request.resource.data;
+      return hasRequiredFields(['uid', 'email', 'firstName', 'lastName', 'gender', 'searchId', 'createdAt']) &&
+             validStringLength('uid', 1, 100) &&
+             validStringLength('email', 5, 100) &&
+             validStringLength('firstName', 1, 50) &&
+             validStringLength('lastName', 1, 50) &&
+             validStringLength('searchId', 3, 20) &&
+             data.gender in ['male', 'female', 'other'] &&
+             data.createdAt is timestamp &&
+             isValidOptionalString('address', 0, 200) &&
+             (!( 'theme' in data ) || data.theme in ['light', 'dark', 'system']);
+    }
+    
+    function isValidContact() {
+      let data = request.resource.data;
+      return hasRequiredFields(['contactUid', 'addedAt']) &&
+             validStringLength('contactUid', 1, 100) &&
+             data.addedAt is timestamp;
+    }
+    
+    function isValidChat() {
+      let data = request.resource.data;
+      return hasRequiredFields(['participants']) &&
+             data.participants is list &&
+             data.participants.size() == 2 &&
+             data.participants[0] is string &&
+             data.participants[1] is string &&
+             (!( 'lastMessage' in data ) || data.lastMessage is string) &&
+             (!( 'lastMessageAt' in data ) || data.lastMessageAt is timestamp);
+    }
+    
+    function isValidMessage() {
+      let data = request.resource.data;
+      return hasRequiredFields(['chatId', 'senderId', 'type', 'createdAt']) &&
+             validStringLength('chatId', 1, 100) &&
+             validStringLength('senderId', 1, 100) &&
+             data.type in ['text', 'audio', 'image', 'video'] &&
+             (!( 'text' in data ) || data.text is string) &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    
+    match /users/{userId} {
+      // Users can read any profile to search for them by searchId or to see contact info
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser() && request.resource.data.uid == userId;
+      allow update: if isOwner(userId) && isValidUser() && request.resource.data.uid == resource.data.uid && request.resource.data.createdAt == resource.data.createdAt;
+      
+      match /contacts/{contactId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidContact();
+        allow update: if isOwner(userId) && isValidContact() && request.resource.data.contactUid == resource.data.contactUid;
+        allow delete: if isOwner(userId);
+      }
+    }
+    
+    match /chats/{chatId} {
+      // Only participants can read or update the chat
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      allow create: if isAuthenticated() && isValidChat() && request.auth.uid in request.resource.data.participants;
+      // Allow updating lastMessage and lastMessageAt if participant
+      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants && isValidChat() && request.resource.data.participants == resource.data.participants;
+      
+      match /messages/{messageId} {
+        // Only participants of the parent chat can read/create messages
+        allow read: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow create: if isAuthenticated() && 
+                      request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
+                      request.auth.uid == request.resource.data.senderId &&
+                      isValidMessage();
+        // Messages are immutable
+        allow update, delete: if false;
+      }
+    }
+  }
+}

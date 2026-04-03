@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User ID" },
+        "email": { "type": "string", "format": "email" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "gender": { "type": "string", "enum": ["male", "female", "other"] },
+        "searchId": { "type": "string", "description": "Unique alphanumeric ID for searching" },
+        "address": { "type": "string", "description": "User address" },
+        "theme": { "type": "string", "enum": ["light", "dark", "system"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "firstName", "lastName", "gender", "searchId", "createdAt"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "description": "A contact added by a user",
+      "type": "object",
+      "properties": {
+        "contactUid": { "type": "string" },
+        "addedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["contactUid", "addedAt"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "A chat room between users",
+      "type": "object",
+      "properties": {
+        "participants": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "lastMessage": { "type": "string" },
+        "lastMessageAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["participants"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A message in a chat room",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "type": { "type": "string", "enum": ["text", "audio", "image", "video"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["chatId", "senderId", "type", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/users/{userId}/contacts/{contactId}": {
+      "schema": { "$ref": "#/entities/Contact" },
+      "description": "User contacts"
+    },
+    "/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/Chat" },
+      "description": "Chat rooms"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Messages in a chat room"
+    }
+  }
+}
