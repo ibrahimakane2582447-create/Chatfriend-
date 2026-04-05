@@ -4,7 +4,7 @@ import { collection, query, orderBy, onSnapshot, addDoc, doc, getDoc, updateDoc,
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, Mic, Image as ImageIcon, Video, Send, Check, Palette, Trash2, Copy, X, Eye, EyeOff, UserPlus } from 'lucide-react';
+import { ArrowLeft, Mic, Image as ImageIcon, Video, Send, Check, CheckCheck, Clock, Palette, Trash2, Copy, X, Eye, EyeOff, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '../lib/utils';
@@ -452,8 +452,14 @@ export default function ChatRoom() {
                   <p className={cn("text-[10px] mt-1 text-right flex items-center justify-end gap-1", isMe ? "opacity-70" : "text-gray-400")}>
                     {format(new Date(msg.createdAt), 'HH:mm')}
                     {isMe && (
-                      <span className="font-bold ml-1">
-                        {msg.read ? '¡' : (msg.isPending ? '...' : '¿')}
+                      <span className="ml-1 flex items-center">
+                        {msg.read ? (
+                          <CheckCheck className="w-3.5 h-3.5 text-blue-400" />
+                        ) : msg.isPending ? (
+                          <span className="font-bold tracking-widest">...</span>
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
                       </span>
                     )}
                   </p>
