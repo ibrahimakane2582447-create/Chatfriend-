@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, query, orderBy, onSnapshot, addDoc, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, doc, getDoc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, Mic, Image as ImageIcon, Video, Send, Check, Palette, Trash2, Copy, X, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Mic, Image as ImageIcon, Video, Send, Check, Palette, Trash2, Copy, X, Eye, EyeOff, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '../lib/utils';
@@ -20,6 +20,7 @@ export default function ChatRoom() {
   const [isRecording, setIsRecording] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [isContact, setIsContact] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -42,9 +43,15 @@ export default function ChatRoom() {
   useEffect(() => {
     if (!user || !chatId) return;
 
+    // Set presence
+    const chatRef = doc(db, 'chats', chatId);
+    updateDoc(chatRef, {
+      [`presence.${user.uid}`]: true
+    }).catch(() => {});
+
     // Fetch chat details
     const fetchChat = async () => {
-      const chatDoc = await getDoc(doc(db, 'chats', chatId));
+      const chatDoc = await getDoc(chatRef);
       if (chatDoc.exists()) {
         const data = chatDoc.data();
         setChat({ id: chatDoc.id, ...data });
@@ -52,12 +59,26 @@ export default function ChatRoom() {
         if (otherId) {
           const userSnap = await getDoc(doc(db, 'users', otherId));
           if (userSnap.exists()) {
-            setOtherUser({ uid: userSnap.id, ...userSnap.data() });
+            const otherUserData = { uid: userSnap.id, ...userSnap.data() };
+            setOtherUser(otherUserData);
+            
+            // Check if contact
+            if (otherId !== user.uid) {
+              const contactDoc = await getDoc(doc(db, 'users', user.uid, 'contacts', otherId));
+              setIsContact(contactDoc.exists());
+            }
           }
         }
       }
     };
     fetchChat();
+
+    // Listen to chat updates for presence
+    const unsubscribeChat = onSnapshot(chatRef, (doc) => {
+      if (doc.exists()) {
+        setChat({ id: doc.id, ...doc.data() });
+      }
+    });
 
     // Listen to messages
     const q = query(
@@ -65,17 +86,40 @@ export default function ChatRoom() {
       orderBy('createdAt', 'asc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+    const unsubscribeMessages = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
+      const msgs = snapshot.docs.map(docSnapshot => {
+        const data = docSnapshot.data();
+        // Mark as read if from other user
+        if (data.senderId !== user.uid && !data.read) {
+          updateDoc(docSnapshot.ref, { read: true }).catch(() => {});
+        }
+        return {
+          id: docSnapshot.id,
+          ...data,
+          isPending: docSnapshot.metadata.hasPendingWrites
+        };
+      });
       setMessages(msgs);
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     });
 
-    return () => unsubscribe();
+    return () => {
+      updateDoc(chatRef, {
+        [`presence.${user.uid}`]: false
+      }).catch(() => {});
+      unsubscribeChat();
+      unsubscribeMessages();
+    };
   }, [chatId, user]);
+
+  const handleAddContact = async () => {
+    if (!user || !otherUser) return;
+    await setDoc(doc(db, 'users', user.uid, 'contacts', otherUser.uid), {
+      contactUid: otherUser.uid,
+      addedAt: new Date().toISOString()
+    });
+    setIsContact(true);
+  };
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -91,6 +135,7 @@ export default function ChatRoom() {
       senderId: user.uid,
       text,
       type: 'text',
+      read: false,
       createdAt: now
     });
 
@@ -162,6 +207,7 @@ export default function ChatRoom() {
         mediaUrl: downloadUrl,
         viewOnce: isViewOnce,
         viewed: false,
+        read: false,
         createdAt: now
       });
 
@@ -269,7 +315,7 @@ export default function ChatRoom() {
         </div>
       )}
 
-      {/* Viewing Media Modal (Full Screen) */}
+      {/* Viewing Media Modal (Full Screen) - Only for View Once now */}
       {viewingMedia && (
         <div className="absolute inset-0 z-50 bg-black flex flex-col">
           <div className="p-4 flex justify-end absolute top-0 w-full z-10 bg-gradient-to-b from-black/50 to-transparent">
@@ -304,7 +350,9 @@ export default function ChatRoom() {
               </div>
               <div className="ml-3">
                 <h2 className="font-semibold">{otherUser.firstName} {otherUser.lastName} {otherUser.uid === user?.uid && '(Moi)'}</h2>
-                <p className="text-xs text-gray-400">ID: {otherUser.searchId}</p>
+                <p className={cn("text-xs", chat?.presence?.[otherUser.uid] ? "text-green-400" : "text-gray-400")}>
+                  {chat?.presence?.[otherUser.uid] ? '( en train de te regarder)' : `ID: ${otherUser.searchId}`}
+                </p>
               </div>
             </div>
           )}
@@ -332,6 +380,19 @@ export default function ChatRoom() {
           )}
         </div>
       </div>
+
+      {/* Add Contact Banner */}
+      {!isContact && otherUser && otherUser.uid !== user?.uid && (
+        <div className="bg-gray-900 p-3 flex items-center justify-between border-b border-gray-800">
+          <span className="text-sm text-gray-300">Ce contact n'est pas dans votre liste.</span>
+          <button 
+            onClick={handleAddContact}
+            className="px-4 py-1.5 bg-white text-black text-xs font-bold rounded-full hover:bg-gray-200 flex items-center gap-1"
+          >
+            <UserPlus className="w-4 h-4" /> Ajouter
+          </button>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -365,7 +426,6 @@ export default function ChatRoom() {
                   onContextMenu={(e) => e.preventDefault()}
                   onClick={() => {
                     if (isViewOnce && !isMe && !isViewed) handleViewMedia(msg);
-                    else if (!isViewOnce && msg.mediaUrl) handleViewMedia(msg);
                   }}
                 >
                   {msg.type === 'text' && <p className="text-sm break-words">{msg.text}</p>}
@@ -381,16 +441,21 @@ export default function ChatRoom() {
                         </div>
                       ) : (
                         msg.type === 'image' ? (
-                          <img src={msg.mediaUrl} alt="Media" className="rounded-lg max-h-48 object-cover" />
+                          <img src={msg.mediaUrl} alt="Media" className="rounded-lg max-h-64 w-full object-cover" />
                         ) : (
-                          <video src={msg.mediaUrl} className="rounded-lg max-h-48 object-cover" />
+                          <video src={msg.mediaUrl} controls className="rounded-lg max-h-64 w-full object-cover" />
                         )
                       )}
                     </div>
                   )}
 
-                  <p className={cn("text-[10px] mt-1 text-right", isMe ? "opacity-70" : "text-gray-400")}>
+                  <p className={cn("text-[10px] mt-1 text-right flex items-center justify-end gap-1", isMe ? "opacity-70" : "text-gray-400")}>
                     {format(new Date(msg.createdAt), 'HH:mm')}
+                    {isMe && (
+                      <span className="font-bold ml-1">
+                        {msg.read ? '¡' : (msg.isPending ? '...' : '¿')}
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>

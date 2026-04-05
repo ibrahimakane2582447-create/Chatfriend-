@@ -17,7 +17,7 @@ export default function MainLayout() {
             className={({ isActive }) =>
               cn(
                 "flex flex-col items-center p-2 transition-colors",
-                isActive ? "text-pink-500" : "text-gray-400 hover:text-gray-300"
+                isActive ? "text-white" : "text-gray-400 hover:text-gray-300"
               )
             }
           >
@@ -30,7 +30,7 @@ export default function MainLayout() {
             className={({ isActive }) =>
               cn(
                 "flex flex-col items-center p-2 transition-colors",
-                isActive ? "text-pink-500" : "text-gray-400 hover:text-gray-300"
+                isActive ? "text-white" : "text-gray-400 hover:text-gray-300"
               )
             }
           >
@@ -43,7 +43,7 @@ export default function MainLayout() {
             className={({ isActive }) =>
               cn(
                 "flex flex-col items-center p-2 transition-colors",
-                isActive ? "text-pink-500" : "text-gray-400 hover:text-gray-300"
+                isActive ? "text-white" : "text-gray-400 hover:text-gray-300"
               )
             }
           >

@@ -102,7 +102,7 @@ export default function Profile() {
 
       <div className="flex-1 overflow-y-auto pb-6">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-24 h-24 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg shadow-pink-500/20 mb-4 overflow-hidden">
+          <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg mb-4 overflow-hidden">
             {photoUrl ? (
               <img src={photoUrl} alt="Profil" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
@@ -126,7 +126,7 @@ export default function Profile() {
                 value={searchId}
                 onChange={(e) => setSearchId(e.target.value)}
                 placeholder="Votre numéro de recherche"
-                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all text-white font-mono"
+                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all text-white font-mono"
               />
             </div>
 
@@ -140,7 +140,7 @@ export default function Profile() {
                 value={photoUrl}
                 onChange={(e) => setPhotoUrl(e.target.value)}
                 placeholder="https://exemple.com/photo.jpg"
-                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all text-white"
+                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all text-white"
               />
             </div>
 
@@ -154,7 +154,7 @@ export default function Profile() {
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Votre adresse (optionnel)"
-                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all text-white"
+                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all text-white"
               />
             </div>
 
@@ -166,7 +166,7 @@ export default function Profile() {
               <select
                 value={theme}
                 onChange={(e) => setTheme(e.target.value)}
-                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all text-white"
+                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all text-white"
               >
                 <option value="dark">Sombre (Défaut)</option>
                 <option value="light">Clair</option>
@@ -183,7 +183,7 @@ export default function Profile() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 mt-4"
+              className="w-full py-3 bg-white hover:bg-gray-200 text-black rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 mt-4"
             >
               <Save className="w-5 h-5" />
               {saving ? 'Enregistrement...' : 'Enregistrer les modifications'}
@@ -225,7 +225,7 @@ export default function Profile() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mot de passe"
-                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-pink-500 outline-none text-white"
+                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-white outline-none text-white"
               />
               
               {authError && <p className="text-red-500 text-sm">{authError}</p>}
@@ -236,7 +236,7 @@ export default function Profile() {
                 className={`w-full py-3 rounded-xl font-semibold transition-colors ${
                   authAction === 'delete' 
                     ? 'bg-red-600 hover:bg-red-700 text-white' 
-                    : 'bg-pink-600 hover:bg-pink-700 text-white'
+                    : 'bg-white hover:bg-gray-200 text-black'
                 }`}
               >
                 {authLoading ? 'Vérification...' : 'Confirmer'}

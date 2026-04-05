@@ -9,7 +9,7 @@ import { fr } from 'date-fns/locale';
 import MyDay from './MyDay';
 
 export default function ChatList() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [chats, setChats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -59,7 +59,7 @@ export default function ChatList() {
   }, [user]);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-pink-500"></div></div>;
+    return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-white"></div></div>;
   }
 
   if (chats.length === 0) {
@@ -76,7 +76,7 @@ export default function ChatList() {
           </p>
           <button
             onClick={() => navigate('/add')}
-            className="mt-6 px-6 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-full font-semibold transition-colors"
+            className="mt-6 px-6 py-3 bg-white hover:bg-gray-200 text-black rounded-full font-semibold transition-colors"
           >
             Ajouter un contact
           </button>
@@ -89,7 +89,21 @@ export default function ChatList() {
     <div className="flex flex-col h-full">
       <MyDay />
       <div className="p-4 flex-1 overflow-y-auto">
-        <h1 className="text-2xl font-bold mb-6 px-2">Messages</h1>
+        <div className="flex justify-between items-center mb-6 px-2">
+          <h1 className="text-2xl font-bold">Messages</h1>
+          {profile && (
+            <div className="flex items-center gap-2 bg-gray-900 rounded-full py-1 pl-3 pr-1 border border-gray-800">
+              <span className="text-xs text-gray-400 font-mono">ID: {profile.searchId}</span>
+              <div className="w-7 h-7 rounded-full overflow-hidden bg-gray-800 flex items-center justify-center text-xs font-bold text-white">
+                {profile.photoUrl ? (
+                  <img src={profile.photoUrl} alt="Me" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <>{profile.firstName.charAt(0)}</>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         <div className="space-y-2">
           {chats.map((chat) => (
             <div
@@ -97,7 +111,7 @@ export default function ChatList() {
               onClick={() => navigate(`/chat/${chat.id}`)}
               className="flex items-center p-3 hover:bg-gray-900 rounded-2xl cursor-pointer transition-colors"
             >
-              <div className="w-14 h-14 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-lg shrink-0 overflow-hidden">
+              <div className="w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-lg shrink-0 overflow-hidden">
                 {chat.otherUser.photoUrl ? (
                   <img src={chat.otherUser.photoUrl} alt="Profil" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (

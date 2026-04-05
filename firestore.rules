@@ -68,7 +68,8 @@ service cloud.firestore {
              (data.participants.size() == 1 || data.participants[1] is string) &&
              (!( 'lastMessage' in data ) || data.lastMessage is string) &&
              (!( 'lastMessageAt' in data ) || data.lastMessageAt is string) &&
-             (!( 'theme' in data ) || data.theme is string);
+             (!( 'theme' in data ) || data.theme is string) &&
+             (!( 'presence' in data ) || data.presence is map);
     }
     
     function isValidMessage() {
@@ -81,6 +82,7 @@ service cloud.firestore {
              (!( 'mediaUrl' in data ) || data.mediaUrl is string) &&
              (!( 'viewOnce' in data ) || data.viewOnce is bool) &&
              (!( 'viewed' in data ) || data.viewed is bool) &&
+             (!( 'read' in data ) || data.read is bool) &&
              data.createdAt is string;
     }
 
@@ -126,11 +128,11 @@ service cloud.firestore {
                       request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
                       request.auth.uid == request.resource.data.senderId &&
                       isValidMessage();
-        // Allow updating 'viewed' status for view once messages
+        // Allow updating 'viewed' status for view once messages and 'read' status
         allow update: if isAuthenticated() && 
                       request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
-                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewed']) &&
-                      request.resource.data.viewed == true;
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewed', 'read']) &&
+                      isValidMessage();
         // Allow sender to delete their own messages
         allow delete: if isAuthenticated() && request.auth.uid == resource.data.senderId;
       }

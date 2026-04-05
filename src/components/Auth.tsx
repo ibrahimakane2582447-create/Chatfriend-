@@ -63,14 +63,14 @@ export default function Auth() {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-md space-y-8 text-center">
-          <MessageCircle className="mx-auto h-16 w-16 text-pink-500" />
+          <MessageCircle className="mx-auto h-16 w-16 text-white" />
           <h2 className="text-3xl font-bold">Vérifiez votre e-mail</h2>
           <p className="text-gray-400">
             Un lien de vérification a été envoyé à {email}. Veuillez cliquer sur le lien pour valider votre compte.
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="w-full py-3 px-4 bg-pink-600 hover:bg-pink-700 rounded-full font-semibold transition-colors"
+            className="w-full py-3 px-4 bg-white text-black hover:bg-gray-200 rounded-full font-semibold transition-colors"
           >
             J'ai vérifié mon e-mail
           </button>
@@ -83,7 +83,7 @@ export default function Auth() {
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <MessageCircle className="mx-auto h-16 w-16 text-pink-500" />
+          <MessageCircle className="mx-auto h-16 w-16 text-white" />
           <h2 className="mt-6 text-3xl font-bold tracking-tight">
             Chatfriend
           </h2>
@@ -109,7 +109,7 @@ export default function Auth() {
                       required
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all"
                       placeholder="Prénom"
                     />
                   </div>
@@ -119,7 +119,7 @@ export default function Auth() {
                       required
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all"
                       placeholder="Nom"
                     />
                   </div>
@@ -128,7 +128,7 @@ export default function Auth() {
                   <select
                     value={gender}
                     onChange={(e) => setGender(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all text-white"
+                    className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all text-white"
                   >
                     <option value="male">Homme</option>
                     <option value="female">Femme</option>
@@ -144,7 +144,7 @@ export default function Auth() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all"
                 placeholder="Adresse e-mail"
               />
             </div>
@@ -155,7 +155,7 @@ export default function Auth() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all"
                 placeholder="Mot de passe"
               />
             </div>
@@ -164,7 +164,7 @@ export default function Auth() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 bg-pink-600 hover:bg-pink-700 disabled:opacity-50 rounded-full font-semibold transition-colors"
+            className="w-full py-3 px-4 bg-white text-black hover:bg-gray-200 disabled:opacity-50 rounded-full font-semibold transition-colors"
           >
             {loading ? 'Chargement...' : (isLogin ? 'Se connecter' : "S'inscrire")}
           </button>
@@ -176,7 +176,7 @@ export default function Auth() {
               setIsLogin(!isLogin);
               setError('');
             }}
-            className="text-pink-500 hover:text-pink-400 text-sm font-medium"
+            className="text-gray-300 hover:text-white text-sm font-medium"
           >
             {isLogin ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
           </button>
