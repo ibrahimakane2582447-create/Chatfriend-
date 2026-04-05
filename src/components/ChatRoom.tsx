@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, query, orderBy, onSnapshot, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { collection, query, orderBy, onSnapshot, addDoc, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../firebase';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, Mic, Image as ImageIcon, Video, Send, Check, Palette } from 'lucide-react';
+import { ArrowLeft, Mic, Image as ImageIcon, Video, Send, Check, Palette, Trash2, Copy, X, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '../lib/utils';
@@ -21,6 +22,15 @@ export default function ChatRoom() {
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Media & View Once State
+  const [selectedMessage, setSelectedMessage] = useState<any>(null);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string>('');
+  const [isViewOnce, setIsViewOnce] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [viewingMedia, setViewingMedia] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const themes = [
     { id: 'monochrome', name: 'Noir & Blanc', bg: 'bg-black', bubble: 'bg-white text-black', otherBubble: 'bg-gray-800 text-white' },
@@ -100,12 +110,10 @@ export default function ChatRoom() {
     }, 2000);
   };
 
-  const handlePointerDown = (text: string) => {
+  const handlePointerDown = (msg: any) => {
     timerRef.current = setTimeout(() => {
-      navigator.clipboard.writeText(text);
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 2000);
-    }, 2000); // 2 seconds long press
+      setSelectedMessage(msg);
+    }, 500); // 500ms long press
   };
 
   const handlePointerUp = () => {
@@ -124,6 +132,63 @@ export default function ChatRoom() {
     setShowThemeMenu(false);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setMediaFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setMediaPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSendMedia = async () => {
+    if (!mediaFile || !user || !chatId) return;
+    setUploading(true);
+    try {
+      const fileExt = mediaFile.name.split('.').pop();
+      const fileName = `chats/${chatId}/${Date.now()}.${fileExt}`;
+      const storageRef = ref(storage, fileName);
+      await uploadBytes(storageRef, mediaFile);
+      const downloadUrl = await getDownloadURL(storageRef);
+      
+      const now = new Date().toISOString();
+      const type = mediaFile.type.startsWith('video/') ? 'video' : 'image';
+      
+      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        chatId,
+        senderId: user.uid,
+        type,
+        mediaUrl: downloadUrl,
+        viewOnce: isViewOnce,
+        viewed: false,
+        createdAt: now
+      });
+
+      await updateDoc(doc(db, 'chats', chatId), {
+        lastMessage: isViewOnce ? '📷 Vue unique' : (type === 'image' ? '📷 Image' : '🎥 Vidéo'),
+        lastMessageAt: now
+      });
+
+      setMediaFile(null);
+      setMediaPreview('');
+      setIsViewOnce(false);
+    } catch (error) {
+      console.error("Error uploading media", error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleViewMedia = async (msg: any) => {
+    if (msg.viewOnce && msg.senderId !== user?.uid && !msg.viewed) {
+      await updateDoc(doc(db, 'chats', chatId, 'messages', msg.id), {
+        viewed: true
+      });
+    }
+    setViewingMedia(msg);
+  };
+
   const currentTheme = themes.find(t => t.id === (chat?.theme || 'monochrome')) || themes[0];
 
   return (
@@ -133,6 +198,92 @@ export default function ChatRoom() {
         <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <Check className="w-4 h-4 text-green-400" />
           Texte copié
+        </div>
+      )}
+
+      {/* Long Press Menu Modal */}
+      {selectedMessage && (
+        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end justify-center pb-8 px-4" onClick={() => setSelectedMessage(null)}>
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm overflow-hidden animate-in slide-in-from-bottom-4" onClick={e => e.stopPropagation()}>
+            {selectedMessage.type === 'text' && (
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(selectedMessage.text);
+                  setShowToast(true);
+                  setTimeout(() => setShowToast(false), 2000);
+                  setSelectedMessage(null);
+                }}
+                className="w-full p-4 flex items-center gap-3 hover:bg-gray-800 transition-colors border-b border-gray-800 text-white"
+              >
+                <Copy className="w-5 h-5" /> Copier le texte
+              </button>
+            )}
+            {selectedMessage.senderId === user?.uid && (
+              <button 
+                onClick={async () => {
+                  await deleteDoc(doc(db, 'chats', chatId, 'messages', selectedMessage.id));
+                  setSelectedMessage(null);
+                }}
+                className="w-full p-4 flex items-center gap-3 hover:bg-gray-800 transition-colors text-red-500"
+              >
+                <Trash2 className="w-5 h-5" /> Supprimer
+              </button>
+            )}
+            <button onClick={() => setSelectedMessage(null)} className="w-full p-4 text-center text-gray-400 hover:bg-gray-800 transition-colors bg-gray-950">
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Media Preview Modal (Before Sending) */}
+      {mediaPreview && (
+        <div className="absolute inset-0 z-50 bg-black/90 flex flex-col">
+          <div className="p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
+            <button onClick={() => { setMediaPreview(''); setMediaFile(null); }} className="p-2 text-white">
+              <X className="w-6 h-6" />
+            </button>
+            <button 
+              onClick={() => setIsViewOnce(!isViewOnce)} 
+              className={cn("px-4 py-2 rounded-full font-medium flex items-center gap-2 transition-colors", isViewOnce ? "bg-white text-black" : "bg-gray-800 text-gray-300")}
+            >
+              <Eye className="w-4 h-4" /> Vue unique
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-4">
+            {mediaFile?.type.startsWith('video/') ? (
+              <video src={mediaPreview} controls className="max-h-full max-w-full rounded-lg" />
+            ) : (
+              <img src={mediaPreview} alt="Preview" className="max-h-full max-w-full rounded-lg object-contain" />
+            )}
+          </div>
+          <div className="p-4 bg-gradient-to-t from-black/80 to-transparent flex justify-end">
+            <button 
+              onClick={handleSendMedia}
+              disabled={uploading}
+              className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center hover:bg-gray-200 disabled:opacity-50"
+            >
+              <Send className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Viewing Media Modal (Full Screen) */}
+      {viewingMedia && (
+        <div className="absolute inset-0 z-50 bg-black flex flex-col">
+          <div className="p-4 flex justify-end absolute top-0 w-full z-10 bg-gradient-to-b from-black/50 to-transparent">
+            <button onClick={() => setViewingMedia(null)} className="p-2 text-white drop-shadow-md">
+              <X className="w-8 h-8" />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            {viewingMedia.type === 'video' ? (
+              <video src={viewingMedia.mediaUrl} controls autoPlay className="w-full h-full object-contain" />
+            ) : (
+              <img src={viewingMedia.mediaUrl} alt="Media" className="w-full h-full object-contain" />
+            )}
+          </div>
         </div>
       )}
 
@@ -187,6 +338,8 @@ export default function ChatRoom() {
         {messages.map((msg, index) => {
           const isMe = msg.senderId === user?.uid;
           const showDate = index === 0 || new Date(messages[index - 1].createdAt).toDateString() !== new Date(msg.createdAt).toDateString();
+          const isViewOnce = msg.viewOnce;
+          const isViewed = msg.viewed;
           
           return (
             <React.Fragment key={msg.id}>
@@ -200,17 +353,42 @@ export default function ChatRoom() {
               <div className={cn("flex", isMe ? "justify-end" : "justify-start")}>
                 <div
                   className={cn(
-                    "max-w-[75%] rounded-2xl px-4 py-2.5 select-none",
+                    "max-w-[75%] rounded-2xl px-4 py-2.5 select-none relative",
                     isMe 
                       ? `${currentTheme.bubble} rounded-tr-sm` 
-                      : `${currentTheme.otherBubble} rounded-tl-sm`
+                      : `${currentTheme.otherBubble} rounded-tl-sm`,
+                    isViewOnce && !isMe && !isViewed && "cursor-pointer animate-pulse"
                   )}
-                  onPointerDown={() => handlePointerDown(msg.text)}
+                  onPointerDown={() => handlePointerDown(msg)}
                   onPointerUp={handlePointerUp}
                   onPointerLeave={handlePointerUp}
                   onContextMenu={(e) => e.preventDefault()}
+                  onClick={() => {
+                    if (isViewOnce && !isMe && !isViewed) handleViewMedia(msg);
+                    else if (!isViewOnce && msg.mediaUrl) handleViewMedia(msg);
+                  }}
                 >
-                  <p className="text-sm">{msg.text}</p>
+                  {msg.type === 'text' && <p className="text-sm break-words">{msg.text}</p>}
+                  
+                  {(msg.type === 'image' || msg.type === 'video') && (
+                    <div className="flex flex-col items-center justify-center">
+                      {isViewOnce ? (
+                        <div className="flex items-center gap-2 py-2">
+                          {isViewed ? <EyeOff className="w-5 h-5 opacity-50" /> : <Eye className="w-5 h-5" />}
+                          <span className="text-sm font-medium">
+                            {isMe ? (isViewed ? 'Ouvert' : 'Vue unique envoyée') : (isViewed ? 'Ouvert' : 'Appuyer pour voir')}
+                          </span>
+                        </div>
+                      ) : (
+                        msg.type === 'image' ? (
+                          <img src={msg.mediaUrl} alt="Media" className="rounded-lg max-h-48 object-cover" />
+                        ) : (
+                          <video src={msg.mediaUrl} className="rounded-lg max-h-48 object-cover" />
+                        )
+                      )}
+                    </div>
+                  )}
+
                   <p className={cn("text-[10px] mt-1 text-right", isMe ? "opacity-70" : "text-gray-400")}>
                     {format(new Date(msg.createdAt), 'HH:mm')}
                   </p>
@@ -222,15 +400,19 @@ export default function ChatRoom() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - TikTok style (dark, sleek, floating icons) */}
+      {/* Input Area */}
       <div className="p-4 bg-gradient-to-t from-black via-black to-transparent pb-6">
         <div className="flex items-end gap-2 bg-gray-900 p-2 rounded-3xl border border-gray-800">
           <div className="flex gap-1 p-1">
-            <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+              accept="image/*,video/*" 
+              className="hidden" 
+            />
+            <button onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors">
               <ImageIcon className="w-5 h-5" />
-            </button>
-            <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors">
-              <Video className="w-5 h-5" />
             </button>
           </div>
           

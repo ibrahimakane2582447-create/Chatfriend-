@@ -78,6 +78,9 @@ service cloud.firestore {
              validStringLength('senderId', 1, 100) &&
              data.type in ['text', 'audio', 'image', 'video'] &&
              (!( 'text' in data ) || data.text is string) &&
+             (!( 'mediaUrl' in data ) || data.mediaUrl is string) &&
+             (!( 'viewOnce' in data ) || data.viewOnce is bool) &&
+             (!( 'viewed' in data ) || data.viewed is bool) &&
              data.createdAt is string;
     }
 
@@ -123,8 +126,13 @@ service cloud.firestore {
                       request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
                       request.auth.uid == request.resource.data.senderId &&
                       isValidMessage();
-        // Messages are immutable
-        allow update, delete: if false;
+        // Allow updating 'viewed' status for view once messages
+        allow update: if isAuthenticated() && 
+                      request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewed']) &&
+                      request.resource.data.viewed == true;
+        // Allow sender to delete their own messages
+        allow delete: if isAuthenticated() && request.auth.uid == resource.data.senderId;
       }
     }
 
