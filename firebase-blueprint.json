@@ -53,6 +53,19 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["chatId", "senderId", "type", "createdAt"]
+    },
+    "Story": {
+      "title": "Story",
+      "description": "A user's My Day story/status",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "mediaType": { "type": "string", "enum": ["image", "video"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "mediaUrl", "mediaType", "createdAt", "expiresAt"]
     }
   },
   "firestore": {
@@ -71,6 +84,10 @@
     "/chats/{chatId}/messages/{messageId}": {
       "schema": { "$ref": "#/entities/Message" },
       "description": "Messages in a chat room"
+    },
+    "/stories/{storyId}": {
+      "schema": { "$ref": "#/entities/Story" },
+      "description": "User stories (My Day)"
     }
   }
 }

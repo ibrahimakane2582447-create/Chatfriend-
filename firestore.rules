@@ -46,7 +46,7 @@ service cloud.firestore {
              validStringLength('lastName', 1, 50) &&
              validStringLength('searchId', 3, 20) &&
              data.gender in ['male', 'female', 'other'] &&
-             data.createdAt is timestamp &&
+             data.createdAt is string &&
              isValidOptionalString('address', 0, 200) &&
              isValidOptionalString('photoUrl', 0, 1000) &&
              (!( 'theme' in data ) || data.theme in ['light', 'dark', 'system']);
@@ -56,7 +56,7 @@ service cloud.firestore {
       let data = request.resource.data;
       return hasRequiredFields(['contactUid', 'addedAt']) &&
              validStringLength('contactUid', 1, 100) &&
-             data.addedAt is timestamp;
+             data.addedAt is string;
     }
     
     function isValidChat() {
@@ -67,7 +67,8 @@ service cloud.firestore {
              data.participants[0] is string &&
              (data.participants.size() == 1 || data.participants[1] is string) &&
              (!( 'lastMessage' in data ) || data.lastMessage is string) &&
-             (!( 'lastMessageAt' in data ) || data.lastMessageAt is timestamp);
+             (!( 'lastMessageAt' in data ) || data.lastMessageAt is string) &&
+             (!( 'theme' in data ) || data.theme is string);
     }
     
     function isValidMessage() {
@@ -77,7 +78,17 @@ service cloud.firestore {
              validStringLength('senderId', 1, 100) &&
              data.type in ['text', 'audio', 'image', 'video'] &&
              (!( 'text' in data ) || data.text is string) &&
-             data.createdAt is timestamp;
+             data.createdAt is string;
+    }
+
+    function isValidStory() {
+      let data = request.resource.data;
+      return hasRequiredFields(['userId', 'mediaUrl', 'mediaType', 'createdAt', 'expiresAt']) &&
+             data.userId == request.auth.uid &&
+             validStringLength('mediaUrl', 1, 1000) &&
+             data.mediaType in ['image', 'video'] &&
+             data.createdAt is string &&
+             data.expiresAt is string;
     }
 
     // ===============================================================
@@ -115,6 +126,13 @@ service cloud.firestore {
         // Messages are immutable
         allow update, delete: if false;
       }
+    }
+
+    match /stories/{storyId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidStory();
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update: if false;
     }
   }
 }
