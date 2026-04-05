@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Search, UserPlus } from 'lucide-react';
+import { Search, UserPlus, MessageSquare } from 'lucide-react';
 
 export default function AddContact() {
   const { user, profile } = useAuth();
@@ -29,11 +29,7 @@ export default function AddContact() {
         setError("Aucun utilisateur trouvé avec ce numéro de recherche.");
       } else {
         const foundUser = querySnapshot.docs[0].data();
-        if (foundUser.uid === user?.uid) {
-          setError("Vous ne pouvez pas vous ajouter vous-même.");
-        } else {
-          setResult(foundUser);
-        }
+        setResult({ ...foundUser, isSelf: foundUser.uid === user?.uid });
       }
     } catch (err) {
       setError("Une erreur est survenue lors de la recherche.");
@@ -47,6 +43,9 @@ export default function AddContact() {
     setLoading(true);
 
     try {
+      const isSelf = result.uid === user.uid;
+      const participants = isSelf ? [user.uid] : [user.uid, result.uid];
+
       // Check if chat already exists
       const q = query(
         collection(db, 'chats'),
@@ -57,8 +56,14 @@ export default function AddContact() {
 
       chatsSnap.forEach((doc) => {
         const data = doc.data();
-        if (data.participants.includes(result.uid)) {
-          existingChatId = doc.id;
+        if (isSelf) {
+          if (data.participants.length === 1 && data.participants[0] === user.uid) {
+            existingChatId = doc.id;
+          }
+        } else {
+          if (data.participants.includes(result.uid) && data.participants.length === 2) {
+            existingChatId = doc.id;
+          }
         }
       });
 
@@ -69,16 +74,18 @@ export default function AddContact() {
 
       // Create new chat
       const chatRef = await addDoc(collection(db, 'chats'), {
-        participants: [user.uid, result.uid],
+        participants,
         lastMessage: '',
         lastMessageAt: new Date().toISOString()
       });
 
-      // Add to contacts subcollection
-      await setDoc(doc(db, 'users', user.uid, 'contacts', result.uid), {
-        contactUid: result.uid,
-        addedAt: new Date().toISOString()
-      });
+      // Add to contacts subcollection if it's not self
+      if (!isSelf) {
+        await setDoc(doc(db, 'users', user.uid, 'contacts', result.uid), {
+          contactUid: result.uid,
+          addedAt: new Date().toISOString()
+        });
+      }
 
       navigate(`/chat/${chatRef.id}`);
     } catch (err) {
@@ -128,19 +135,29 @@ export default function AddContact() {
 
       {result && (
         <div className="bg-gray-900 p-6 rounded-2xl flex flex-col items-center text-center mt-4 animate-in fade-in slide-in-from-bottom-4">
-          <div className="w-24 h-24 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg mb-4">
-            {result.firstName.charAt(0)}{result.lastName.charAt(0)}
+          <div className="w-24 h-24 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg mb-4 overflow-hidden">
+            {result.photoUrl ? (
+              <img src={result.photoUrl} alt="Profil" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <>{result.firstName.charAt(0)}{result.lastName.charAt(0)}</>
+            )}
           </div>
           <h3 className="text-xl font-bold">{result.firstName} {result.lastName}</h3>
-          <p className="text-gray-400 text-sm mt-1 mb-6 font-mono">{result.searchId}</p>
+          <p className="text-gray-400 text-sm mt-1 mb-2 font-mono">{result.searchId}</p>
+          
+          {result.isSelf && (
+            <p className="text-pink-500 text-sm mb-4 bg-pink-500/10 px-3 py-1.5 rounded-full">
+              C'est votre profil. Vous pouvez discuter avec vous-même.
+            </p>
+          )}
           
           <button
             onClick={handleAddContact}
             disabled={loading}
-            className="w-full py-3 px-4 bg-pink-600 hover:bg-pink-700 text-white rounded-full font-semibold flex items-center justify-center gap-2 transition-colors"
+            className="w-full py-3 px-4 bg-pink-600 hover:bg-pink-700 text-white rounded-full font-semibold flex items-center justify-center gap-2 transition-colors mt-2"
           >
-            <UserPlus className="w-5 h-5" />
-            Commencer à discuter
+            {result.isSelf ? <MessageSquare className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
+            {result.isSelf ? 'Notes personnelles' : 'Commencer à discuter'}
           </button>
         </div>
       )}

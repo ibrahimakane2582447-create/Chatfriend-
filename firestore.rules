@@ -48,6 +48,7 @@ service cloud.firestore {
              data.gender in ['male', 'female', 'other'] &&
              data.createdAt is timestamp &&
              isValidOptionalString('address', 0, 200) &&
+             isValidOptionalString('photoUrl', 0, 1000) &&
              (!( 'theme' in data ) || data.theme in ['light', 'dark', 'system']);
     }
     
@@ -62,9 +63,9 @@ service cloud.firestore {
       let data = request.resource.data;
       return hasRequiredFields(['participants']) &&
              data.participants is list &&
-             data.participants.size() == 2 &&
+             (data.participants.size() == 1 || data.participants.size() == 2) &&
              data.participants[0] is string &&
-             data.participants[1] is string &&
+             (data.participants.size() == 1 || data.participants[1] is string) &&
              (!( 'lastMessage' in data ) || data.lastMessage is string) &&
              (!( 'lastMessageAt' in data ) || data.lastMessageAt is timestamp);
     }

@@ -12,6 +12,7 @@ interface UserProfile {
   searchId: string;
   address?: string;
   theme?: string;
+  photoUrl?: string;
 }
 
 interface AuthContextType {

@@ -24,10 +24,10 @@ export default function ChatList() {
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       const chatPromises = snapshot.docs.map(async (chatDoc) => {
         const data = chatDoc.data();
-        const otherUserId = data.participants.find((id: string) => id !== user.uid);
+        const otherUserId = data.participants.find((id: string) => id !== user.uid) || user.uid;
         
         // Fetch other user's profile
-        let otherUser = { firstName: 'Utilisateur', lastName: 'Inconnu' };
+        let otherUser = { firstName: 'Utilisateur', lastName: 'Inconnu', photoUrl: '' };
         if (otherUserId) {
           const userSnap = await getDoc(doc(db, 'users', otherUserId));
           if (userSnap.exists()) {
@@ -91,13 +91,17 @@ export default function ChatList() {
             onClick={() => navigate(`/chat/${chat.id}`)}
             className="flex items-center p-3 hover:bg-gray-900 rounded-2xl cursor-pointer transition-colors"
           >
-            <div className="w-14 h-14 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-lg shrink-0">
-              {chat.otherUser.firstName.charAt(0)}{chat.otherUser.lastName.charAt(0)}
+            <div className="w-14 h-14 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-lg shrink-0 overflow-hidden">
+              {chat.otherUser.photoUrl ? (
+                <img src={chat.otherUser.photoUrl} alt="Profil" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <>{chat.otherUser.firstName.charAt(0)}{chat.otherUser.lastName.charAt(0)}</>
+              )}
             </div>
             <div className="ml-4 flex-1 overflow-hidden">
               <div className="flex justify-between items-baseline">
                 <h3 className="font-semibold text-lg truncate">
-                  {chat.otherUser.firstName} {chat.otherUser.lastName}
+                  {chat.otherUser.firstName} {chat.otherUser.lastName} {chat.otherUser.uid === user.uid && '(Moi)'}
                 </h3>
                 {chat.lastMessageAt && (
                   <span className="text-xs text-gray-500 shrink-0 ml-2">

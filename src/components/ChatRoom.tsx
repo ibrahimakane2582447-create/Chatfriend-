@@ -26,7 +26,7 @@ export default function ChatRoom() {
       const chatDoc = await getDoc(doc(db, 'chats', chatId));
       if (chatDoc.exists()) {
         const data = chatDoc.data();
-        const otherId = data.participants.find((id: string) => id !== user.uid);
+        const otherId = data.participants.find((id: string) => id !== user.uid) || user.uid;
         if (otherId) {
           const userSnap = await getDoc(doc(db, 'users', otherId));
           if (userSnap.exists()) {
@@ -97,11 +97,15 @@ export default function ChatRoom() {
         </button>
         {otherUser && (
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full flex items-center justify-center font-bold text-sm shadow-md">
-              {otherUser.firstName.charAt(0)}{otherUser.lastName.charAt(0)}
+            <div className="w-10 h-10 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full flex items-center justify-center font-bold text-sm shadow-md overflow-hidden">
+              {otherUser.photoUrl ? (
+                <img src={otherUser.photoUrl} alt="Profil" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <>{otherUser.firstName.charAt(0)}{otherUser.lastName.charAt(0)}</>
+              )}
             </div>
             <div className="ml-3">
-              <h2 className="font-semibold">{otherUser.firstName} {otherUser.lastName}</h2>
+              <h2 className="font-semibold">{otherUser.firstName} {otherUser.lastName} {otherUser.uid === user?.uid && '(Moi)'}</h2>
               <p className="text-xs text-green-400">En ligne</p>
             </div>
           </div>
