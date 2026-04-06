@@ -53,7 +53,17 @@ export default function Auth() {
         setVerificationSent(true);
       }
     } catch (err: any) {
-      setError(err.message || 'Une erreur est survenue');
+      console.error("Auth error:", err);
+      // Personnalisation du message d'erreur comme demandé
+      if (err.code === 'auth/too-many-requests' || err.code === 'auth/network-request-failed') {
+        setError('Veuillez attendre un moment et réessayer.');
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+        setError('Email ou mot de passe incorrect.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('Cette adresse e-mail est déjà utilisée.');
+      } else {
+        setError('Une erreur est survenue. Veuillez attendre un moment et réessayer.');
+      }
     } finally {
       setLoading(false);
     }
