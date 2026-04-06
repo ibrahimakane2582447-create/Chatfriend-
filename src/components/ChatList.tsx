@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { collection, query, where, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
@@ -7,15 +7,22 @@ import { MessageSquarePlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import MyDay from './MyDay';
+import { cn } from '../lib/utils';
 
 export default function ChatList() {
   const { user, profile } = useAuth();
   const [chats, setChats] = useState<any[]>([]);
+  const chatsRef = useRef<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) return;
+
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
 
     const q = query(
       collection(db, 'chats'),
@@ -24,7 +31,7 @@ export default function ChatList() {
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       const chatPromises = snapshot.docs.map(async (chatDoc) => {
-        const data = chatDoc.data();
+        const data = chatDoc.data() as any;
         const otherUserId = data.participants.find((id: string) => id !== user.uid) || user.uid;
         
         // Fetch other user's profile
@@ -44,6 +51,23 @@ export default function ChatList() {
       });
 
       const resolvedChats = await Promise.all(chatPromises);
+      
+      // Check for new unread messages to show notification
+      resolvedChats.forEach(chat => {
+        const currentUnread = chat.unreadCount?.[user.uid] || 0;
+        const previousChat = chatsRef.current.find(c => c.id === chat.id);
+        const previousUnread = previousChat?.unreadCount?.[user.uid] || 0;
+        
+        if (currentUnread > previousUnread && currentUnread > 0) {
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(`Nouveau message de ${chat.otherUser.firstName}`, {
+              body: chat.lastMessage || 'Nouveau message',
+              icon: '/pwa-192x192.png'
+            });
+          }
+        }
+      });
+
       // Sort by lastMessageAt descending
       resolvedChats.sort((a: any, b: any) => {
         const timeA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
@@ -51,6 +75,7 @@ export default function ChatList() {
         return timeB - timeA;
       });
       
+      chatsRef.current = resolvedChats;
       setChats(resolvedChats);
       setLoading(false);
     });
@@ -129,9 +154,16 @@ export default function ChatList() {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-400 truncate mt-0.5">
-                  {chat.lastMessage || 'Nouvelle discussion'}
-                </p>
+                <div className="flex justify-between items-center mt-0.5">
+                  <p className={cn("text-sm truncate", chat.unreadCount?.[user?.uid || ''] ? "text-white font-semibold" : "text-gray-400")}>
+                    {chat.lastMessage || 'Nouvelle discussion'}
+                  </p>
+                  {chat.unreadCount?.[user?.uid || ''] > 0 && (
+                    <span className="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full ml-2 shrink-0">
+                      {chat.unreadCount[user!.uid]}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           ))}

@@ -15,9 +15,6 @@ export default function MyDay() {
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   
   // Add Story State
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<string>('');
-  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
   const [adding, setAdding] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -96,58 +93,42 @@ export default function MyDay() {
     }
   }, [showViewModal, currentViewIndex, currentStoryIndex, groupedStories]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && user) {
       const file = e.target.files[0];
-      setMediaFile(file);
-      setMediaType(file.type.startsWith('video/') ? 'video' : 'image');
+      const type = file.type.startsWith('video/') ? 'video' : 'image';
       
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setMediaPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+      setAdding(true);
+      setShowAddModal(true); // Show loading state
 
-  const handleAddStory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !mediaFile) return;
-    setAdding(true);
+      try {
+        // 1. Upload file to Firebase Storage
+        const fileExt = file.name.split('.').pop();
+        const fileName = `stories/${user.uid}_${Date.now()}.${fileExt}`;
+        const storageRef = ref(storage, fileName);
+        
+        await uploadBytes(storageRef, file);
+        const downloadUrl = await getDownloadURL(storageRef);
 
-    try {
-      // 1. Upload file to Firebase Storage
-      const fileExt = mediaFile.name.split('.').pop();
-      const fileName = `stories/${user.uid}_${Date.now()}.${fileExt}`;
-      const storageRef = ref(storage, fileName);
-      
-      await uploadBytes(storageRef, mediaFile);
-      const downloadUrl = await getDownloadURL(storageRef);
+        // 2. Save to Firestore
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // +24 hours
 
-      // 2. Save to Firestore
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // +24 hours
+        await addDoc(collection(db, 'stories'), {
+          userId: user.uid,
+          mediaUrl: downloadUrl,
+          mediaType: type,
+          createdAt: now.toISOString(),
+          expiresAt: expiresAt.toISOString()
+        });
 
-      await addDoc(collection(db, 'stories'), {
-        userId: user.uid,
-        mediaUrl: downloadUrl,
-        mediaType,
-        createdAt: now.toISOString(),
-        expiresAt: expiresAt.toISOString()
-      });
-
-      setShowAddModal(false);
-      setMediaFile(null);
-      setMediaPreview('');
-    } catch (error: any) {
-      console.error("Error adding story:", error);
-      if (error.code === 'storage/unauthorized') {
-        alert("Erreur : Le stockage Firebase n'est pas autorisé. Veuillez vérifier les règles de sécurité Storage dans la console Firebase.");
-      } else {
+      } catch (error: any) {
+        console.error("Error adding story:", error);
         alert("Erreur lors de l'ajout de la story.");
+      } finally {
+        setAdding(false);
+        setShowAddModal(false);
       }
-    } finally {
-      setAdding(false);
     }
   };
 
@@ -184,21 +165,34 @@ export default function MyDay() {
     <div className="py-4 border-b border-gray-800">
       <div className="flex overflow-x-auto px-4 gap-4 no-scrollbar">
         {/* Add Story Button */}
-        <div className="flex flex-col items-center gap-1 shrink-0 cursor-pointer" onClick={() => setShowAddModal(true)}>
+        <div className="flex flex-col items-center gap-1 shrink-0 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
           <div className="relative w-16 h-16 rounded-full p-[2px] bg-gray-800">
             <div className="w-full h-full rounded-full overflow-hidden bg-gray-900 flex items-center justify-center">
-              {profile?.photoUrl ? (
+              {adding ? (
+                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-white"></div>
+              ) : profile?.photoUrl ? (
                 <img src={profile.photoUrl} alt="Me" className="w-full h-full object-cover opacity-50" referrerPolicy="no-referrer" />
               ) : (
                 <span className="text-xl font-bold text-gray-500">{profile?.firstName.charAt(0)}</span>
               )}
             </div>
-            <div className="absolute bottom-0 right-0 bg-white rounded-full p-1 border-2 border-black">
-              <Plus className="w-4 h-4 text-black" />
-            </div>
+            {!adding && (
+              <div className="absolute bottom-0 right-0 bg-white rounded-full p-1 border-2 border-black">
+                <Plus className="w-4 h-4 text-black" />
+              </div>
+            )}
           </div>
-          <span className="text-xs text-gray-400">Ajouter</span>
+          <span className="text-xs text-gray-400">{adding ? 'Envoi...' : 'Ajouter'}</span>
         </div>
+        
+        {/* Hidden file input */}
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleFileChange} 
+          accept="image/*,video/*" 
+          className="hidden" 
+        />
 
         {/* Stories List */}
         {groupedStories.map((group, index) => (
@@ -218,54 +212,6 @@ export default function MyDay() {
           </div>
         ))}
       </div>
-
-      {/* Add Story Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-          <div className="bg-gray-900 rounded-2xl p-6 w-full max-w-sm relative">
-            <button onClick={() => { setShowAddModal(false); setMediaFile(null); setMediaPreview(''); }} className="absolute top-4 right-4 text-gray-400 hover:text-white">
-              <X className="w-6 h-6" />
-            </button>
-            <h2 className="text-xl font-bold mb-6">Ajouter à My Day</h2>
-            <form onSubmit={handleAddStory} className="space-y-4">
-              
-              <div 
-                className="border-2 border-dashed border-gray-700 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-800 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {mediaPreview ? (
-                  mediaType === 'image' ? (
-                    <img src={mediaPreview} alt="Preview" className="max-h-48 object-contain rounded-lg" />
-                  ) : (
-                    <video src={mediaPreview} className="max-h-48 object-contain rounded-lg" controls />
-                  )
-                ) : (
-                  <>
-                    <Upload className="w-10 h-10 text-gray-500 mb-2" />
-                    <p className="text-sm text-gray-400 text-center">Cliquez pour sélectionner une image ou une vidéo</p>
-                  </>
-                )}
-              </div>
-              
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileChange} 
-                accept="image/*,video/*" 
-                className="hidden" 
-              />
-
-              <button
-                type="submit"
-                disabled={adding || !mediaFile}
-                className="w-full py-3 bg-white hover:bg-gray-200 text-black rounded-xl font-semibold disabled:opacity-50 mt-4 transition-colors"
-              >
-                {adding ? 'Publication...' : 'Publier'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* View Story Modal */}
       {showViewModal && groupedStories.length > 0 && (

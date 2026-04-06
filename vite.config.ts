@@ -14,8 +14,8 @@ export default defineConfig(({mode}) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         manifest: {
-          name: 'Chat App',
-          short_name: 'Chat',
+          name: 'Chatfriend',
+          short_name: 'Chatfriend',
           description: 'Application de messagerie en temps réel',
           theme_color: '#000000',
           background_color: '#000000',

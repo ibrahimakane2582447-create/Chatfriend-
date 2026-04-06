@@ -18,6 +18,10 @@ export default function ChatRoom() {
   const [otherUser, setOtherUser] = useState<any>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [isContact, setIsContact] = useState(true);
@@ -88,10 +92,12 @@ export default function ChatRoom() {
 
     const unsubscribeMessages = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
       const msgs = snapshot.docs.map(docSnapshot => {
-        const data = docSnapshot.data();
+        const data = docSnapshot.data() as any;
         // Mark as read if from other user
         if (data.senderId !== user.uid && !data.read) {
           updateDoc(docSnapshot.ref, { read: true }).catch(() => {});
+          // Also update chat document
+          updateDoc(chatRef, { [`unreadCount.${user.uid}`]: 0 }).catch(() => {});
         }
         return {
           id: docSnapshot.id,
@@ -99,9 +105,28 @@ export default function ChatRoom() {
           isPending: docSnapshot.metadata.hasPendingWrites
         };
       });
+      
+      // Check for new messages for notification
+      if (msgs.length > messages.length && messages.length > 0) {
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg.senderId !== user.uid && !lastMsg.read && !lastMsg.isPending) {
+          if (Notification.permission === 'granted') {
+            new Notification('Nouveau message', {
+              body: lastMsg.type === 'text' ? lastMsg.text : (lastMsg.type === 'audio' ? '🎤 Message vocal' : '📷 Média'),
+              icon: '/pwa-192x192.png'
+            });
+          }
+        }
+      }
+      
       setMessages(msgs);
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     });
+
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
 
     return () => {
       updateDoc(chatRef, {
@@ -141,18 +166,85 @@ export default function ChatRoom() {
 
     await updateDoc(doc(db, 'chats', chatId), {
       lastMessage: text,
-      lastMessageAt: now
+      lastMessageAt: now,
+      lastMessageSenderId: user.uid,
+      [`unreadCount.${otherUser?.uid || 'unknown'}`]: 1
     });
   };
 
-  const handleVoiceRecord = () => {
-    setIsRecording(true);
-    // Simulate recording
-    setTimeout(() => {
+  const handleVoiceRecordStart = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+        setRecordingTime(0);
+        
+        if (audioBlob.size > 0 && user && chatId) {
+          setUploading(true);
+          try {
+            const fileName = `chats/${chatId}/audio_${Date.now()}.webm`;
+            const storageRef = ref(storage, fileName);
+            await uploadBytes(storageRef, audioBlob);
+            const downloadUrl = await getDownloadURL(storageRef);
+            
+            const now = new Date().toISOString();
+            await addDoc(collection(db, 'chats', chatId, 'messages'), {
+              chatId,
+              senderId: user.uid,
+              type: 'audio',
+              mediaUrl: downloadUrl,
+              read: false,
+              createdAt: now
+            });
+
+            await updateDoc(doc(db, 'chats', chatId), {
+              lastMessage: '🎤 Message vocal',
+              lastMessageAt: now,
+              lastMessageSenderId: user.uid,
+              [`unreadCount.${otherUser?.uid || 'unknown'}`]: 1
+            });
+          } catch (error) {
+            console.error("Error uploading audio", error);
+          } finally {
+            setUploading(false);
+          }
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      
+      let time = 0;
+      recordingTimerRef.current = setInterval(() => {
+        time += 1;
+        setRecordingTime(time);
+      }, 1000);
+      
+    } catch (err) {
+      console.error("Microphone access denied", err);
+      alert("Veuillez autoriser l'accès au microphone pour envoyer des messages vocaux.");
+    }
+  };
+
+  const handleVoiceRecordStop = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
       setIsRecording(false);
-      // In a real app, we would upload the audio file to Storage and send the URL
-      alert("L'enregistrement vocal n'est pas encore implémenté dans cette démo.");
-    }, 2000);
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    }
   };
 
   const handlePointerDown = (msg: any) => {
@@ -213,7 +305,9 @@ export default function ChatRoom() {
 
       await updateDoc(doc(db, 'chats', chatId), {
         lastMessage: isViewOnce ? '📷 Vue unique' : (type === 'image' ? '📷 Image' : '🎥 Vidéo'),
-        lastMessageAt: now
+        lastMessageAt: now,
+        lastMessageSenderId: user.uid,
+        [`unreadCount.${otherUser?.uid || 'unknown'}`]: 1
       });
 
       setMediaFile(null);
@@ -283,37 +377,7 @@ export default function ChatRoom() {
       )}
 
       {/* Media Preview Modal (Before Sending) */}
-      {mediaPreview && (
-        <div className="absolute inset-0 z-50 bg-black/90 flex flex-col">
-          <div className="p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
-            <button onClick={() => { setMediaPreview(''); setMediaFile(null); }} className="p-2 text-white">
-              <X className="w-6 h-6" />
-            </button>
-            <button 
-              onClick={() => setIsViewOnce(!isViewOnce)} 
-              className={cn("px-4 py-2 rounded-full font-medium flex items-center gap-2 transition-colors", isViewOnce ? "bg-white text-black" : "bg-gray-800 text-gray-300")}
-            >
-              <Eye className="w-4 h-4" /> Vue unique
-            </button>
-          </div>
-          <div className="flex-1 flex items-center justify-center p-4">
-            {mediaFile?.type.startsWith('video/') ? (
-              <video src={mediaPreview} controls className="max-h-full max-w-full rounded-lg" />
-            ) : (
-              <img src={mediaPreview} alt="Preview" className="max-h-full max-w-full rounded-lg object-contain" />
-            )}
-          </div>
-          <div className="p-4 bg-gradient-to-t from-black/80 to-transparent flex justify-end">
-            <button 
-              onClick={handleSendMedia}
-              disabled={uploading}
-              className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center hover:bg-gray-200 disabled:opacity-50"
-            >
-              <Send className="w-6 h-6" />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Removed full screen modal, moved to inline preview above input */}
 
       {/* Viewing Media Modal (Full Screen) - Only for View Once now */}
       {viewingMedia && (
@@ -340,7 +404,14 @@ export default function ChatRoom() {
             <ArrowLeft className="w-6 h-6" />
           </button>
           {otherUser && (
-            <div className="flex items-center">
+            <div 
+              className={cn("flex items-center", !isContact && otherUser.uid !== user?.uid && "cursor-pointer hover:opacity-80")} 
+              onClick={() => {
+                if (!isContact && otherUser.uid !== user?.uid) {
+                  handleAddContact();
+                }
+              }}
+            >
               <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center font-bold text-sm shadow-md overflow-hidden">
                 {otherUser.photoUrl ? (
                   <img src={otherUser.photoUrl} alt="Profil" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -349,7 +420,14 @@ export default function ChatRoom() {
                 )}
               </div>
               <div className="ml-3">
-                <h2 className="font-semibold">{otherUser.firstName} {otherUser.lastName} {otherUser.uid === user?.uid && '(Moi)'}</h2>
+                <h2 className="font-semibold flex items-center gap-2">
+                  {otherUser.firstName} {otherUser.lastName} {otherUser.uid === user?.uid && '(Moi)'}
+                  {!isContact && otherUser.uid !== user?.uid && (
+                    <span className="text-[10px] bg-white text-black px-2 py-0.5 rounded-full whitespace-nowrap">
+                      Appuyez pour ajouter
+                    </span>
+                  )}
+                </h2>
                 <p className={cn("text-xs", chat?.presence?.[otherUser.uid] ? "text-green-400" : "text-gray-400")}>
                   {chat?.presence?.[otherUser.uid] ? '( en train de te regarder)' : `ID: ${otherUser.searchId}`}
                 </p>
@@ -449,6 +527,13 @@ export default function ChatRoom() {
                     </div>
                   )}
 
+                  {msg.type === 'audio' && (
+                    <div className="flex items-center gap-2 py-1 min-w-[150px]">
+                      <Mic className="w-4 h-4" />
+                      <audio src={msg.mediaUrl} controls className="h-8 w-full max-w-[200px]" />
+                    </div>
+                  )}
+
                   <p className={cn("text-[10px] mt-1 text-right flex items-center justify-end gap-1", isMe ? "opacity-70" : "text-gray-400")}>
                     {format(new Date(msg.createdAt), 'HH:mm')}
                     {isMe && (
@@ -473,6 +558,37 @@ export default function ChatRoom() {
 
       {/* Input Area */}
       <div className="p-4 bg-gradient-to-t from-black via-black to-transparent pb-6">
+        {/* Inline Media Preview */}
+        {mediaPreview && (
+          <div className="mb-2 bg-gray-900 rounded-2xl p-2 border border-gray-800 flex items-end gap-2 relative">
+            <button onClick={() => { setMediaPreview(''); setMediaFile(null); }} className="absolute -top-2 -left-2 bg-gray-800 rounded-full p-1 text-white border border-gray-700 z-10">
+              <X className="w-4 h-4" />
+            </button>
+            <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-black shrink-0">
+              {mediaFile?.type.startsWith('video/') ? (
+                <video src={mediaPreview} className="w-full h-full object-cover" />
+              ) : (
+                <img src={mediaPreview} alt="Preview" className="w-full h-full object-cover" />
+              )}
+            </div>
+            <div className="flex-1 flex flex-col justify-center gap-2">
+              <button 
+                onClick={() => setIsViewOnce(!isViewOnce)} 
+                className={cn("self-start px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 transition-colors", isViewOnce ? "bg-white text-black" : "bg-gray-800 text-gray-300")}
+              >
+                <Eye className="w-3.5 h-3.5" /> Vue unique
+              </button>
+            </div>
+            <button 
+              onClick={handleSendMedia}
+              disabled={uploading}
+              className="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center hover:bg-gray-200 disabled:opacity-50 shrink-0"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
         <div className="flex items-end gap-2 bg-gray-900 p-2 rounded-3xl border border-gray-800">
           <div className="flex gap-1 p-1">
             <input 
@@ -487,19 +603,25 @@ export default function ChatRoom() {
             </button>
           </div>
           
-          <textarea
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Envoyer un message..."
-            className="flex-1 bg-transparent text-white max-h-32 min-h-[40px] py-2.5 px-2 resize-none focus:outline-none text-sm"
-            rows={1}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-          />
+          {isRecording ? (
+            <div className="flex-1 flex items-center justify-center text-red-500 font-mono text-sm animate-pulse">
+              Enregistrement... {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+            </div>
+          ) : (
+            <textarea
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Envoyer un message..."
+              className="flex-1 bg-transparent text-white max-h-32 min-h-[40px] py-2.5 px-2 resize-none focus:outline-none text-sm"
+              rows={1}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+            />
+          )}
           
           <div className="p-1">
             {newMessage.trim() ? (
@@ -511,7 +633,9 @@ export default function ChatRoom() {
               </button>
             ) : (
               <button 
-                onPointerDown={handleVoiceRecord}
+                onPointerDown={handleVoiceRecordStart}
+                onPointerUp={handleVoiceRecordStop}
+                onPointerLeave={handleVoiceRecordStop}
                 className={cn(
                   "p-2.5 rounded-full transition-all shadow-lg",
                   isRecording 
