@@ -33,9 +33,9 @@ export default function MainLayout() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-black text-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-slate-50 text-slate-900 overflow-hidden">
       {deferredPrompt && showBanner && (
-        <div className="bg-blue-600 text-white px-4 py-3 flex items-center justify-between shrink-0 z-50">
+        <div className="bg-blue-600 text-white px-4 py-3 flex items-center justify-between shrink-0 z-50 shadow-md">
           <div className="flex items-center gap-3">
             <div className="bg-white/20 p-2 rounded-lg">
               <Download className="w-5 h-5" />
@@ -48,11 +48,11 @@ export default function MainLayout() {
           <div className="flex items-center gap-2">
             <button 
               onClick={handleInstallClick}
-              className="bg-white text-blue-600 px-3 py-1.5 rounded-full text-sm font-bold shadow-sm"
+              className="bg-white text-blue-600 px-3 py-1.5 rounded-full text-sm font-bold shadow-sm hover:bg-blue-50 transition-colors"
             >
               Installer
             </button>
-            <button onClick={() => setShowBanner(false)} className="p-1 text-blue-200 hover:text-white">
+            <button onClick={() => setShowBanner(false)} className="p-1 text-blue-200 hover:text-white transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -63,14 +63,14 @@ export default function MainLayout() {
         <Outlet />
       </main>
       
-      <nav className="fixed bottom-0 w-full bg-gray-900 border-t border-gray-800 px-6 py-3">
+      <nav className="fixed bottom-0 w-full bg-white border-t border-slate-200 px-6 py-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <div className="flex justify-between items-center max-w-md mx-auto">
           <NavLink
             to="/"
             className={({ isActive }) =>
               cn(
                 "flex flex-col items-center p-2 transition-colors",
-                isActive ? "text-white" : "text-gray-400 hover:text-gray-300"
+                isActive ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
               )
             }
           >
@@ -83,7 +83,7 @@ export default function MainLayout() {
             className={({ isActive }) =>
               cn(
                 "flex flex-col items-center p-2 transition-colors",
-                isActive ? "text-white" : "text-gray-400 hover:text-gray-300"
+                isActive ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
               )
             }
           >
@@ -96,7 +96,7 @@ export default function MainLayout() {
             className={({ isActive }) =>
               cn(
                 "flex flex-col items-center p-2 transition-colors",
-                isActive ? "text-white" : "text-gray-400 hover:text-gray-300"
+                isActive ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
               )
             }
           >

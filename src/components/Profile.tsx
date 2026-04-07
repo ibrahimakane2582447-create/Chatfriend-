@@ -150,12 +150,12 @@ export default function Profile() {
   if (!profile) return null;
 
   return (
-    <div className="p-4 h-full flex flex-col relative">
+    <div className="p-4 h-full flex flex-col relative bg-slate-50 text-slate-900">
       <div className="flex justify-between items-center mb-6 px-2">
         <h1 className="text-2xl font-bold">Profil</h1>
         <button 
           onClick={() => openAuthModal('logout')}
-          className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+          className="p-2 text-slate-400 hover:text-red-500 transition-colors"
         >
           <LogOut className="w-6 h-6" />
         </button>
@@ -164,24 +164,24 @@ export default function Profile() {
       <div className="flex-1 overflow-y-auto pb-6">
         <div className="flex flex-col items-center mb-8">
           <div 
-            className="relative w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg mb-4 cursor-pointer group"
+            className="relative w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center text-3xl font-bold text-blue-700 shadow-sm mb-4 cursor-pointer group"
             onClick={() => fileInputRef.current?.click()}
           >
             {isUploading ? (
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-white"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-blue-600"></div>
             ) : photoUrl ? (
               <img src={photoUrl} alt="Profil" className="w-full h-full object-cover rounded-full group-hover:opacity-50 transition-opacity" referrerPolicy="no-referrer" />
             ) : (
               <span className="group-hover:opacity-50 transition-opacity">{profile.firstName.charAt(0)}{profile.lastName.charAt(0)}</span>
             )}
             {!isUploading && (
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-full">
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-full">
                 <Camera className="w-8 h-8 text-white" />
               </div>
             )}
           </div>
           <h2 className="text-xl font-bold">{profile.firstName} {profile.lastName}</h2>
-          <p className="text-gray-400 text-sm">{profile.email}</p>
+          <p className="text-slate-500 text-sm">{profile.email}</p>
           
           <input 
             type="file" 
@@ -194,9 +194,9 @@ export default function Profile() {
 
         <div className="space-y-6">
           {/* Settings Form */}
-          <div className="bg-gray-900 p-4 rounded-2xl space-y-4">
+          <div className="bg-white p-4 rounded-2xl space-y-4 shadow-sm border border-slate-100">
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
                 <Hash className="w-4 h-4" />
                 Numéro de recherche
               </label>
@@ -205,12 +205,12 @@ export default function Profile() {
                 value={searchId}
                 onChange={(e) => setSearchId(e.target.value)}
                 placeholder="Votre numéro de recherche"
-                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all text-white font-mono"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900 font-mono"
               />
             </div>
 
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
                 <MapPin className="w-4 h-4" />
                 Adresse
               </label>
@@ -219,28 +219,28 @@ export default function Profile() {
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Votre adresse (optionnel)"
-                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all text-white"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900"
               />
             </div>
 
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
                 <Palette className="w-4 h-4" />
                 Thème
               </label>
               <select
                 value={theme}
                 onChange={(e) => setTheme(e.target.value)}
-                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all text-white"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900"
               >
-                <option value="dark">Sombre (Défaut)</option>
-                <option value="light">Clair</option>
+                <option value="light">Clair (Défaut)</option>
+                <option value="dark">Sombre</option>
                 <option value="system">Système</option>
               </select>
             </div>
 
             {message.text && (
-              <p className={`text-sm text-center py-2 ${message.type === 'error' ? 'text-red-500' : 'text-green-400'}`}>
+              <p className={`text-sm text-center py-2 ${message.type === 'error' ? 'text-red-500' : 'text-green-600'}`}>
                 {message.text}
               </p>
             )}
@@ -248,7 +248,7 @@ export default function Profile() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full py-3 bg-white hover:bg-gray-200 text-black rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 mt-4"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 mt-4 shadow-sm"
             >
               <Save className="w-5 h-5" />
               {saving ? 'Enregistrement...' : 'Enregistrer les modifications'}
@@ -277,19 +277,19 @@ export default function Profile() {
 
       {/* Auth Modal */}
       {showAuthModal && (
-        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm relative">
+        <div className="absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-sm relative shadow-xl">
             <button 
               onClick={() => setShowAuthModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-900"
             >
               <X className="w-5 h-5" />
             </button>
             
-            <h3 className="text-xl font-bold mb-2">
+            <h3 className="text-xl font-bold mb-2 text-slate-900">
               {authAction === 'delete' ? 'Supprimer le compte' : 'Se déconnecter'}
             </h3>
-            <p className="text-gray-400 text-sm mb-6">
+            <p className="text-slate-500 text-sm mb-6">
               Veuillez entrer votre mot de passe pour confirmer cette action.
             </p>
 
@@ -300,7 +300,7 @@ export default function Profile() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mot de passe"
-                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-white outline-none text-white"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-900"
               />
               
               {authError && <p className="text-red-500 text-sm">{authError}</p>}
@@ -308,10 +308,10 @@ export default function Profile() {
               <button
                 type="submit"
                 disabled={authLoading}
-                className={`w-full py-3 rounded-xl font-semibold transition-colors ${
+                className={`w-full py-3 rounded-xl font-semibold transition-colors shadow-sm ${
                   authAction === 'delete' 
                     ? 'bg-red-600 hover:bg-red-700 text-white' 
-                    : 'bg-white hover:bg-gray-200 text-black'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
                 }`}
               >
                 {authLoading ? 'Vérification...' : 'Confirmer'}

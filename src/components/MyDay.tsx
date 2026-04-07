@@ -162,27 +162,27 @@ export default function MyDay() {
   const hasMyStory = groupedStories.some(g => g.userId === user?.uid);
 
   return (
-    <div className="py-4 border-b border-gray-800">
+    <div className="py-4 border-b border-slate-200 bg-white">
       <div className="flex overflow-x-auto px-4 gap-4 no-scrollbar">
         {/* Add Story Button */}
         <div className="flex flex-col items-center gap-1 shrink-0 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-          <div className="relative w-16 h-16 rounded-full p-[2px] bg-gray-800">
-            <div className="w-full h-full rounded-full overflow-hidden bg-gray-900 flex items-center justify-center">
+          <div className="relative w-16 h-16 rounded-full p-[2px] bg-slate-200">
+            <div className="w-full h-full rounded-full overflow-hidden bg-slate-100 flex items-center justify-center">
               {adding ? (
-                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-white"></div>
+                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-blue-600"></div>
               ) : profile?.photoUrl ? (
                 <img src={profile.photoUrl} alt="Me" className="w-full h-full object-cover opacity-50" referrerPolicy="no-referrer" />
               ) : (
-                <span className="text-xl font-bold text-gray-500">{profile?.firstName.charAt(0)}</span>
+                <span className="text-xl font-bold text-slate-400">{profile?.firstName.charAt(0)}</span>
               )}
             </div>
             {!adding && (
-              <div className="absolute bottom-0 right-0 bg-white rounded-full p-1 border-2 border-black">
-                <Plus className="w-4 h-4 text-black" />
+              <div className="absolute bottom-0 right-0 bg-blue-600 rounded-full p-1 border-2 border-white shadow-sm">
+                <Plus className="w-4 h-4 text-white" />
               </div>
             )}
           </div>
-          <span className="text-xs text-gray-400">{adding ? 'Envoi...' : 'Ajouter'}</span>
+          <span className="text-xs text-slate-500 font-medium">{adding ? 'Envoi...' : 'Ajouter'}</span>
         </div>
         
         {/* Hidden file input */}
@@ -197,8 +197,8 @@ export default function MyDay() {
         {/* Stories List */}
         {groupedStories.map((group, index) => (
           <div key={group.userId} className="flex flex-col items-center gap-1 shrink-0 cursor-pointer" onClick={() => openStory(index)}>
-            <div className={`w-16 h-16 rounded-full p-[2px] ${group.userId === user?.uid ? 'bg-gray-500' : 'bg-white'}`}>
-              <div className="w-full h-full rounded-full overflow-hidden bg-gray-900 flex items-center justify-center text-xl font-bold text-white">
+            <div className={`w-16 h-16 rounded-full p-[2px] ${group.userId === user?.uid ? 'bg-slate-300' : 'bg-blue-600'}`}>
+              <div className="w-full h-full rounded-full overflow-hidden bg-blue-100 flex items-center justify-center text-xl font-bold text-blue-700">
                 {group.userProfile?.photoUrl ? (
                   <img src={group.userProfile.photoUrl} alt={group.userProfile.firstName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
@@ -206,7 +206,7 @@ export default function MyDay() {
                 )}
               </div>
             </div>
-            <span className="text-xs text-gray-300 truncate w-16 text-center">
+            <span className="text-xs text-slate-700 font-medium truncate w-16 text-center">
               {group.userId === user?.uid ? 'Mon statut' : group.userProfile?.firstName}
             </span>
           </div>

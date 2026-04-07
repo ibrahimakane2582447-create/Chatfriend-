@@ -38,6 +38,7 @@ export default function ChatRoom() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const themes = [
+    { id: 'light', name: 'Clair', bg: 'bg-slate-50', bubble: 'bg-blue-600 text-white', otherBubble: 'bg-white text-slate-900 border border-slate-200 shadow-sm' },
     { id: 'monochrome', name: 'Noir & Blanc', bg: 'bg-black', bubble: 'bg-white text-black', otherBubble: 'bg-gray-800 text-white' },
     { id: 'ocean', name: 'Océan', bg: 'bg-blue-950', bubble: 'bg-blue-600 text-white', otherBubble: 'bg-gray-800 text-white' },
     { id: 'forest', name: 'Forêt', bg: 'bg-green-950', bubble: 'bg-green-600 text-white', otherBubble: 'bg-gray-800 text-white' },
@@ -353,7 +354,7 @@ export default function ChatRoom() {
                   setTimeout(() => setShowToast(false), 2000);
                   setSelectedMessage(null);
                 }}
-                className="w-full p-4 flex items-center gap-3 hover:bg-gray-800 transition-colors border-b border-gray-800 text-white"
+                className="w-full p-4 flex items-center gap-3 hover:bg-slate-50 transition-colors border-b border-slate-100 text-slate-700"
               >
                 <Copy className="w-5 h-5" /> Copier le texte
               </button>
@@ -364,12 +365,12 @@ export default function ChatRoom() {
                   await deleteDoc(doc(db, 'chats', chatId, 'messages', selectedMessage.id));
                   setSelectedMessage(null);
                 }}
-                className="w-full p-4 flex items-center gap-3 hover:bg-gray-800 transition-colors text-red-500"
+                className="w-full p-4 flex items-center gap-3 hover:bg-red-50 transition-colors text-red-600"
               >
                 <Trash2 className="w-5 h-5" /> Supprimer
               </button>
             )}
-            <button onClick={() => setSelectedMessage(null)} className="w-full p-4 text-center text-gray-400 hover:bg-gray-800 transition-colors bg-gray-950">
+            <button onClick={() => setSelectedMessage(null)} className="w-full p-4 text-center text-slate-500 hover:bg-slate-100 transition-colors bg-slate-50 rounded-b-2xl font-medium">
               Annuler
             </button>
           </div>
@@ -398,9 +399,9 @@ export default function ChatRoom() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-black/50 backdrop-blur-md sticky top-0 z-10 border-b border-gray-800">
+      <div className="flex items-center justify-between p-4 bg-white/80 backdrop-blur-md sticky top-0 z-10 border-b border-slate-200 shadow-sm">
         <div className="flex items-center">
-          <button onClick={() => navigate(-1)} className="p-2 mr-2 hover:bg-gray-800 rounded-full transition-colors">
+          <button onClick={() => navigate(-1)} className="p-2 mr-2 hover:bg-slate-100 rounded-full transition-colors text-slate-700">
             <ArrowLeft className="w-6 h-6" />
           </button>
           {otherUser && (
@@ -412,7 +413,7 @@ export default function ChatRoom() {
                 }
               }}
             >
-              <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center font-bold text-sm shadow-md overflow-hidden">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center font-bold text-blue-700 text-sm shadow-sm overflow-hidden">
                 {otherUser.photoUrl ? (
                   <img src={otherUser.photoUrl} alt="Profil" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
@@ -420,15 +421,15 @@ export default function ChatRoom() {
                 )}
               </div>
               <div className="ml-3">
-                <h2 className="font-semibold flex items-center gap-2">
+                <h2 className="font-semibold flex items-center gap-2 text-slate-900">
                   {otherUser.firstName} {otherUser.lastName} {otherUser.uid === user?.uid && '(Moi)'}
                   {!isContact && otherUser.uid !== user?.uid && (
-                    <span className="text-[10px] bg-white text-black px-2 py-0.5 rounded-full whitespace-nowrap">
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full whitespace-nowrap font-medium">
                       Appuyez pour ajouter
                     </span>
                   )}
                 </h2>
-                <p className={cn("text-xs", chat?.presence?.[otherUser.uid] ? "text-green-400" : "text-gray-400")}>
+                <p className={cn("text-xs", chat?.presence?.[otherUser.uid] ? "text-green-600 font-medium" : "text-slate-500")}>
                   {chat?.presence?.[otherUser.uid] ? '( en train de te regarder)' : `ID: ${otherUser.searchId}`}
                 </p>
               </div>
@@ -437,18 +438,18 @@ export default function ChatRoom() {
         </div>
         
         <div className="relative">
-          <button onClick={() => setShowThemeMenu(!showThemeMenu)} className="p-2 hover:bg-gray-800 rounded-full transition-colors">
-            <Palette className="w-5 h-5 text-gray-400" />
+          <button onClick={() => setShowThemeMenu(!showThemeMenu)} className="p-2 hover:bg-slate-100 text-slate-400 hover:text-blue-600 rounded-full transition-colors">
+            <Palette className="w-5 h-5" />
           </button>
           
           {showThemeMenu && (
-            <div className="absolute top-12 right-0 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-2 w-48 z-20">
-              <h3 className="text-xs font-semibold text-gray-500 mb-2 px-2 uppercase tracking-wider">Thèmes</h3>
+            <div className="absolute top-12 right-0 bg-white border border-slate-200 rounded-xl shadow-xl p-2 w-48 z-20">
+              <h3 className="text-xs font-semibold text-slate-500 mb-2 px-2 uppercase tracking-wider">Thèmes</h3>
               {themes.map(t => (
                 <button
                   key={t.id}
                   onClick={() => changeTheme(t.id)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${chat?.theme === t.id ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${chat?.theme === t.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'}`}
                 >
                   {t.name}
                   {chat?.theme === t.id && <Check className="w-4 h-4" />}
@@ -557,14 +558,14 @@ export default function ChatRoom() {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-gradient-to-t from-black via-black to-transparent pb-6">
+      <div className="p-4 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent pb-6">
         {/* Inline Media Preview */}
         {mediaPreview && (
-          <div className="mb-2 bg-gray-900 rounded-2xl p-2 border border-gray-800 flex items-end gap-2 relative">
-            <button onClick={() => { setMediaPreview(''); setMediaFile(null); }} className="absolute -top-2 -left-2 bg-gray-800 rounded-full p-1 text-white border border-gray-700 z-10">
+          <div className="mb-2 bg-white rounded-2xl p-2 border border-slate-200 shadow-sm flex items-end gap-2 relative">
+            <button onClick={() => { setMediaPreview(''); setMediaFile(null); }} className="absolute -top-2 -left-2 bg-white rounded-full p-1 text-slate-500 hover:text-red-500 border border-slate-200 shadow-sm z-10">
               <X className="w-4 h-4" />
             </button>
-            <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-black shrink-0">
+            <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0">
               {mediaFile?.type.startsWith('video/') ? (
                 <video src={mediaPreview} className="w-full h-full object-cover" />
               ) : (
@@ -574,7 +575,7 @@ export default function ChatRoom() {
             <div className="flex-1 flex flex-col justify-center gap-2">
               <button 
                 onClick={() => setIsViewOnce(!isViewOnce)} 
-                className={cn("self-start px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 transition-colors", isViewOnce ? "bg-white text-black" : "bg-gray-800 text-gray-300")}
+                className={cn("self-start px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 transition-colors", isViewOnce ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}
               >
                 <Eye className="w-3.5 h-3.5" /> Vue unique
               </button>
@@ -582,14 +583,14 @@ export default function ChatRoom() {
             <button 
               onClick={handleSendMedia}
               disabled={uploading}
-              className="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center hover:bg-gray-200 disabled:opacity-50 shrink-0"
+              className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 disabled:opacity-50 shrink-0 shadow-sm"
             >
               <Send className="w-5 h-5" />
             </button>
           </div>
         )}
 
-        <div className="flex items-end gap-2 bg-gray-900 p-2 rounded-3xl border border-gray-800">
+        <div className="flex items-end gap-2 bg-white p-2 rounded-3xl border border-slate-200 shadow-sm">
           <div className="flex gap-1 p-1">
             <input 
               type="file" 
@@ -598,7 +599,7 @@ export default function ChatRoom() {
               accept="image/*,video/*" 
               className="hidden" 
             />
-            <button onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-full transition-colors">
+            <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors">
               <ImageIcon className="w-5 h-5" />
             </button>
           </div>
@@ -612,7 +613,7 @@ export default function ChatRoom() {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Envoyer un message..."
-              className="flex-1 bg-transparent text-white max-h-32 min-h-[40px] py-2.5 px-2 resize-none focus:outline-none text-sm"
+              className="flex-1 bg-transparent text-slate-900 max-h-32 min-h-[40px] py-2.5 px-2 resize-none focus:outline-none text-sm placeholder-slate-400"
               rows={1}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -627,7 +628,7 @@ export default function ChatRoom() {
             {newMessage.trim() ? (
               <button 
                 onClick={handleSend}
-                className="p-2.5 bg-white text-black rounded-full hover:bg-gray-200 transition-colors shadow-lg shadow-white/10"
+                className="p-2.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors shadow-sm"
               >
                 <Send className="w-5 h-5" />
               </button>
@@ -637,10 +638,10 @@ export default function ChatRoom() {
                 onPointerUp={handleVoiceRecordStop}
                 onPointerLeave={handleVoiceRecordStop}
                 className={cn(
-                  "p-2.5 rounded-full transition-all shadow-lg",
+                  "p-2.5 rounded-full transition-all shadow-sm",
                   isRecording 
-                    ? "bg-red-500 text-white animate-pulse shadow-red-500/50 scale-110" 
-                    : "bg-gray-800 text-white hover:bg-gray-700 shadow-black/50"
+                    ? "bg-red-500 text-white animate-pulse scale-110" 
+                    : "bg-blue-100 text-blue-600 hover:bg-blue-200"
                 )}
               >
                 <Mic className="w-5 h-5" />

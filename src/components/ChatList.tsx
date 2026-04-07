@@ -62,7 +62,7 @@ export default function ChatList() {
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification(`Nouveau message de ${chat.otherUser.firstName}`, {
               body: chat.lastMessage || 'Nouveau message',
-              icon: '/pwa-192x192.png'
+              icon: '/pwa-192x192.svg'
             });
           }
         }
@@ -84,24 +84,24 @@ export default function ChatList() {
   }, [user]);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-white"></div></div>;
+    return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-blue-600"></div></div>;
   }
 
   if (chats.length === 0) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full bg-slate-50">
         <MyDay />
         <div className="flex flex-col items-center justify-center flex-1 p-6 text-center space-y-4">
-          <div className="w-20 h-20 bg-gray-900 rounded-full flex items-center justify-center mb-4">
-            <MessageSquarePlus className="w-10 h-10 text-gray-500" />
+          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+            <MessageSquarePlus className="w-10 h-10 text-blue-500" />
           </div>
-          <h3 className="text-xl font-semibold text-white">Aucun contact</h3>
-          <p className="text-gray-400 text-sm max-w-xs">
+          <h3 className="text-xl font-semibold text-slate-900">Aucun contact</h3>
+          <p className="text-slate-500 text-sm max-w-xs">
             Aucun contact n'est affiché aléatoire, veuillez ajouter votre premier contact pour commencer à discuter.
           </p>
           <button
             onClick={() => navigate('/add')}
-            className="mt-6 px-6 py-3 bg-white hover:bg-gray-200 text-black rounded-full font-semibold transition-colors"
+            className="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold transition-colors shadow-md"
           >
             Ajouter un contact
           </button>
@@ -111,15 +111,15 @@ export default function ChatList() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-slate-50">
       <MyDay />
       <div className="p-4 flex-1 overflow-y-auto">
         <div className="flex justify-between items-center mb-6 px-2">
-          <h1 className="text-2xl font-bold">Messages</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Messages</h1>
           {profile && (
-            <div className="flex items-center gap-2 bg-gray-900 rounded-full py-1 pl-3 pr-1 border border-gray-800">
-              <span className="text-xs text-gray-400 font-mono">ID: {profile.searchId}</span>
-              <div className="w-7 h-7 rounded-full overflow-hidden bg-gray-800 flex items-center justify-center text-xs font-bold text-white">
+            <div className="flex items-center gap-2 bg-white rounded-full py-1 pl-3 pr-1 border border-slate-200 shadow-sm">
+              <span className="text-xs text-slate-500 font-mono">ID: {profile.searchId}</span>
+              <div className="w-7 h-7 rounded-full overflow-hidden bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700">
                 {profile.photoUrl ? (
                   <img src={profile.photoUrl} alt="Me" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
@@ -134,32 +134,32 @@ export default function ChatList() {
             <div
               key={chat.id}
               onClick={() => navigate(`/chat/${chat.id}`)}
-              className="flex items-center p-3 hover:bg-gray-900 rounded-2xl cursor-pointer transition-colors"
+              className="flex items-center p-3 hover:bg-white bg-transparent rounded-2xl cursor-pointer transition-colors"
             >
-              <div className="w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-lg shrink-0 overflow-hidden">
+              <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-xl font-bold text-blue-700 shadow-sm shrink-0 overflow-hidden">
                 {chat.otherUser.photoUrl ? (
                   <img src={chat.otherUser.photoUrl} alt="Profil" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   <>{chat.otherUser.firstName.charAt(0)}{chat.otherUser.lastName.charAt(0)}</>
                 )}
               </div>
-              <div className="ml-4 flex-1 overflow-hidden">
+              <div className="ml-4 flex-1 overflow-hidden border-b border-slate-100 pb-2">
                 <div className="flex justify-between items-baseline">
-                  <h3 className="font-semibold text-lg truncate">
+                  <h3 className="font-semibold text-lg truncate text-slate-900">
                     {chat.otherUser.firstName} {chat.otherUser.lastName} {chat.otherUser.uid === user?.uid && '(Moi)'}
                   </h3>
                   {chat.lastMessageAt && (
-                    <span className="text-xs text-gray-500 shrink-0 ml-2">
+                    <span className="text-xs text-slate-400 shrink-0 ml-2">
                       {format(new Date(chat.lastMessageAt), 'HH:mm', { locale: fr })}
                     </span>
                   )}
                 </div>
                 <div className="flex justify-between items-center mt-0.5">
-                  <p className={cn("text-sm truncate", chat.unreadCount?.[user?.uid || ''] ? "text-white font-semibold" : "text-gray-400")}>
+                  <p className={cn("text-sm truncate", chat.unreadCount?.[user?.uid || ''] ? "text-slate-900 font-semibold" : "text-slate-500")}>
                     {chat.lastMessage || 'Nouvelle discussion'}
                   </p>
                   {chat.unreadCount?.[user?.uid || ''] > 0 && (
-                    <span className="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full ml-2 shrink-0">
+                    <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full ml-2 shrink-0">
                       {chat.unreadCount[user!.uid]}
                     </span>
                   )}
