@@ -4,7 +4,7 @@ import { auth, db, storage } from '../firebase';
 import { signOut, EmailAuthProvider, reauthenticateWithCredential, deleteUser } from 'firebase/auth';
 import { doc, updateDoc, deleteDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { LogOut, Save, MapPin, Palette, Hash, Image as ImageIcon, AlertTriangle, X, Camera } from 'lucide-react';
+import { LogOut, Save, MapPin, Palette, Hash, Image as ImageIcon, AlertTriangle, X, Camera, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Profile() {
@@ -24,6 +24,32 @@ export default function Profile() {
   const [authAction, setAuthAction] = useState<'logout' | 'delete' | null>(null);
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  React.useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0] && user) {
@@ -228,6 +254,16 @@ export default function Profile() {
               {saving ? 'Enregistrement...' : 'Enregistrer les modifications'}
             </button>
           </div>
+
+          {deferredPrompt && (
+            <button
+              onClick={handleInstallClick}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"
+            >
+              <Download className="w-5 h-5" />
+              Installer l'application
+            </button>
+          )}
 
           <button
             onClick={() => openAuthModal('delete')}
