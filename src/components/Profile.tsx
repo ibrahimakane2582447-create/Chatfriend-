@@ -4,7 +4,7 @@ import { auth, db, storage } from '../firebase';
 import { signOut, EmailAuthProvider, reauthenticateWithCredential, deleteUser } from 'firebase/auth';
 import { doc, updateDoc, deleteDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { LogOut, Save, MapPin, Palette, Hash, Image as ImageIcon, AlertTriangle, X, Camera, Download } from 'lucide-react';
+import { LogOut, Save, MapPin, Palette, Hash, Image as ImageIcon, AlertTriangle, X, Camera, Download, Bell, BellRing, BellOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Profile() {
@@ -26,8 +26,13 @@ export default function Profile() {
   const [authLoading, setAuthLoading] = useState(false);
   
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
   React.useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -39,6 +44,24 @@ export default function Profile() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      setMessage({ text: 'Les notifications ne sont pas supportées par ce navigateur.', type: 'error' });
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === 'granted') {
+        setMessage({ text: 'Notifications activées avec succès !', type: 'success' });
+      } else {
+        setMessage({ text: 'Permission de notification refusée.', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+    }
+  };
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
@@ -237,6 +260,30 @@ export default function Profile() {
                 <option value="dark">Sombre</option>
                 <option value="system">Système</option>
               </select>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-full ${notificationPermission === 'granted' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
+                    {notificationPermission === 'granted' ? <BellRing className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">Notifications Push</p>
+                    <p className="text-xs text-slate-500">
+                      {notificationPermission === 'granted' ? 'Activées pour les nouveaux messages' : 'Désactivées'}
+                    </p>
+                  </div>
+                </div>
+                {notificationPermission !== 'granted' && (
+                  <button
+                    onClick={requestNotificationPermission}
+                    className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-full text-xs font-semibold transition-colors"
+                  >
+                    Activer
+                  </button>
+                )}
+              </div>
             </div>
 
             {message.text && (

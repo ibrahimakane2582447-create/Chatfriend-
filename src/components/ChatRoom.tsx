@@ -8,6 +8,26 @@ import { ArrowLeft, Mic, Image as ImageIcon, Video, Send, Check, CheckCheck, Clo
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '../lib/utils';
+import CryptoJS from 'crypto-js';
+
+// Helper for encryption
+const encryptMessage = (text: string, secret: string) => {
+  try {
+    return CryptoJS.AES.encrypt(text, secret).toString();
+  } catch (e) {
+    return text;
+  }
+};
+
+const decryptMessage = (ciphertext: string, secret: string) => {
+  try {
+    const bytes = CryptoJS.AES.decrypt(ciphertext, secret);
+    const originalText = bytes.toString(CryptoJS.enc.Utf8);
+    return originalText || ciphertext; // Fallback to original if decryption fails (e.g., old unencrypted messages)
+  } catch (e) {
+    return ciphertext;
+  }
+};
 
 export default function ChatRoom() {
   const { chatId } = useParams();
@@ -25,6 +45,8 @@ export default function ChatRoom() {
   const [showToast, setShowToast] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [isContact, setIsContact] = useState(true);
+  const [showContactInfo, setShowContactInfo] = useState(false);
+  const [recordedAudio, setRecordedAudio] = useState<{ blob: Blob, url: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -155,18 +177,19 @@ export default function ChatRoom() {
     setNewMessage('');
 
     const now = new Date().toISOString();
+    const encryptedText = encryptMessage(text, chatId);
 
     await addDoc(collection(db, 'chats', chatId, 'messages'), {
       chatId,
       senderId: user.uid,
-      text,
+      text: encryptedText,
       type: 'text',
       read: false,
       createdAt: now
     });
 
     await updateDoc(doc(db, 'chats', chatId), {
-      lastMessage: text,
+      lastMessage: encryptedText,
       lastMessageAt: now,
       lastMessageSenderId: user.uid,
       [`unreadCount.${otherUser?.uid || 'unknown'}`]: 1
@@ -191,35 +214,9 @@ export default function ChatRoom() {
         stream.getTracks().forEach(track => track.stop());
         setRecordingTime(0);
         
-        if (audioBlob.size > 0 && user && chatId) {
-          setUploading(true);
-          try {
-            const fileName = `chats/${chatId}/audio_${Date.now()}.webm`;
-            const storageRef = ref(storage, fileName);
-            await uploadBytes(storageRef, audioBlob);
-            const downloadUrl = await getDownloadURL(storageRef);
-            
-            const now = new Date().toISOString();
-            await addDoc(collection(db, 'chats', chatId, 'messages'), {
-              chatId,
-              senderId: user.uid,
-              type: 'audio',
-              mediaUrl: downloadUrl,
-              read: false,
-              createdAt: now
-            });
-
-            await updateDoc(doc(db, 'chats', chatId), {
-              lastMessage: '🎤 Message vocal',
-              lastMessageAt: now,
-              lastMessageSenderId: user.uid,
-              [`unreadCount.${otherUser?.uid || 'unknown'}`]: 1
-            });
-          } catch (error) {
-            console.error("Error uploading audio", error);
-          } finally {
-            setUploading(false);
-          }
+        if (audioBlob.size > 0) {
+          const url = URL.createObjectURL(audioBlob);
+          setRecordedAudio({ blob: audioBlob, url });
         }
       };
 
@@ -234,7 +231,7 @@ export default function ChatRoom() {
       
     } catch (err) {
       console.error("Microphone access denied", err);
-      alert("Veuillez autoriser l'accès au microphone pour envoyer des messages vocaux.");
+      alert("Veuillez autoriser l'accès au microphone pour enregistrer des messages vocaux.");
     }
   };
 
@@ -245,6 +242,47 @@ export default function ChatRoom() {
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
       }
+    }
+  };
+
+  const handleSendAudio = async () => {
+    if (!recordedAudio || !user || !chatId) return;
+    setUploading(true);
+    try {
+      const fileName = `chats/${chatId}/audio_${Date.now()}.webm`;
+      const storageRef = ref(storage, fileName);
+      await uploadBytes(storageRef, recordedAudio.blob);
+      const downloadUrl = await getDownloadURL(storageRef);
+      
+      const now = new Date().toISOString();
+      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        chatId,
+        senderId: user.uid,
+        type: 'audio',
+        mediaUrl: downloadUrl,
+        read: false,
+        createdAt: now
+      });
+
+      await updateDoc(doc(db, 'chats', chatId), {
+        lastMessage: '🎤 Message vocal',
+        lastMessageAt: now,
+        lastMessageSenderId: user.uid,
+        [`unreadCount.${otherUser?.uid || 'unknown'}`]: 1
+      });
+      
+      setRecordedAudio(null);
+    } catch (error) {
+      console.error("Error uploading audio", error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleCancelAudio = () => {
+    if (recordedAudio) {
+      URL.revokeObjectURL(recordedAudio.url);
+      setRecordedAudio(null);
     }
   };
 
@@ -398,6 +436,61 @@ export default function ChatRoom() {
         </div>
       )}
 
+      {/* Contact Info Modal */}
+      {showContactInfo && otherUser && (
+        <div className="absolute inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="bg-white w-full sm:w-96 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-4">
+            <div className="p-4 flex justify-between items-center border-b border-slate-100">
+              <h3 className="font-bold text-lg text-slate-900">Infos du contact</h3>
+              <button onClick={() => setShowContactInfo(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 flex flex-col items-center">
+              <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center text-3xl font-bold text-blue-700 shadow-sm mb-4 overflow-hidden">
+                {otherUser.photoUrl ? (
+                  <img src={otherUser.photoUrl} alt="Profil" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <>{otherUser.firstName.charAt(0)}{otherUser.lastName.charAt(0)}</>
+                )}
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900">{otherUser.firstName} {otherUser.lastName}</h2>
+              <p className="text-slate-500 font-mono mt-1">{otherUser.searchId}</p>
+              
+              <div className="w-full mt-6 space-y-4">
+                {otherUser.address && (
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p className="text-xs text-slate-500 mb-1 uppercase tracking-wider font-semibold">Adresse</p>
+                    <p className="text-slate-900">{otherUser.address}</p>
+                  </div>
+                )}
+                
+                {otherUser.createdAt && (
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p className="text-xs text-slate-500 mb-1 uppercase tracking-wider font-semibold">Inscrit(e) le</p>
+                    <p className="text-slate-900">{format(new Date(otherUser.createdAt), 'dd MMMM yyyy', { locale: fr })}</p>
+                  </div>
+                )}
+              </div>
+              
+              {!isContact && otherUser.uid !== user?.uid && (
+                <button 
+                  onClick={() => {
+                    handleAddContact();
+                    setShowContactInfo(false);
+                  }}
+                  className="w-full mt-6 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                >
+                  <UserPlus className="w-5 h-5" />
+                  Ajouter aux contacts
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between p-4 bg-white/80 backdrop-blur-md sticky top-0 z-10 border-b border-slate-200 shadow-sm">
         <div className="flex items-center">
@@ -406,12 +499,8 @@ export default function ChatRoom() {
           </button>
           {otherUser && (
             <div 
-              className={cn("flex items-center", !isContact && otherUser.uid !== user?.uid && "cursor-pointer hover:opacity-80")} 
-              onClick={() => {
-                if (!isContact && otherUser.uid !== user?.uid) {
-                  handleAddContact();
-                }
-              }}
+              className="flex items-center cursor-pointer hover:opacity-80" 
+              onClick={() => setShowContactInfo(true)}
             >
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center font-bold text-blue-700 text-sm shadow-sm overflow-hidden">
                 {otherUser.photoUrl ? (
@@ -425,7 +514,7 @@ export default function ChatRoom() {
                   {otherUser.firstName} {otherUser.lastName} {otherUser.uid === user?.uid && '(Moi)'}
                   {!isContact && otherUser.uid !== user?.uid && (
                     <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full whitespace-nowrap font-medium">
-                      Appuyez pour ajouter
+                      Inconnu
                     </span>
                   )}
                 </h2>
@@ -507,7 +596,7 @@ export default function ChatRoom() {
                     if (isViewOnce && !isMe && !isViewed) handleViewMedia(msg);
                   }}
                 >
-                  {msg.type === 'text' && <p className="text-sm break-words">{msg.text}</p>}
+                  {msg.type === 'text' && <p className="text-sm break-words">{decryptMessage(msg.text, chatId || '')}</p>}
                   
                   {(msg.type === 'image' || msg.type === 'video') && (
                     <div className="flex flex-col items-center justify-center">
@@ -604,7 +693,14 @@ export default function ChatRoom() {
             </button>
           </div>
           
-          {isRecording ? (
+          {recordedAudio ? (
+            <div className="flex-1 flex items-center justify-between bg-blue-50 rounded-full px-4 py-1">
+              <audio src={recordedAudio.url} controls className="h-8 w-full max-w-[150px]" />
+              <button onClick={handleCancelAudio} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ) : isRecording ? (
             <div className="flex-1 flex items-center justify-center text-red-500 font-mono text-sm animate-pulse">
               Enregistrement... {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
             </div>
@@ -625,7 +721,15 @@ export default function ChatRoom() {
           )}
           
           <div className="p-1">
-            {newMessage.trim() ? (
+            {recordedAudio ? (
+              <button 
+                onClick={handleSendAudio}
+                disabled={uploading}
+                className="p-2.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            ) : newMessage.trim() ? (
               <button 
                 onClick={handleSend}
                 className="p-2.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors shadow-sm"
@@ -634,9 +738,7 @@ export default function ChatRoom() {
               </button>
             ) : (
               <button 
-                onPointerDown={handleVoiceRecordStart}
-                onPointerUp={handleVoiceRecordStop}
-                onPointerLeave={handleVoiceRecordStop}
+                onClick={isRecording ? handleVoiceRecordStop : handleVoiceRecordStart}
                 className={cn(
                   "p-2.5 rounded-full transition-all shadow-sm",
                   isRecording 

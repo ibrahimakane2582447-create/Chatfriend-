@@ -8,6 +8,17 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import MyDay from './MyDay';
 import { cn } from '../lib/utils';
+import CryptoJS from 'crypto-js';
+
+const decryptMessage = (ciphertext: string, secret: string) => {
+  try {
+    const bytes = CryptoJS.AES.decrypt(ciphertext, secret);
+    const originalText = bytes.toString(CryptoJS.enc.Utf8);
+    return originalText || ciphertext;
+  } catch (e) {
+    return ciphertext;
+  }
+};
 
 export default function ChatList() {
   const { user, profile } = useAuth();
@@ -64,6 +75,14 @@ export default function ChatList() {
               body: chat.lastMessage || 'Nouveau message',
               icon: '/pwa-192x192.svg'
             });
+            
+            // Play notification sound
+            try {
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
+              audio.play().catch(e => console.log('Audio play failed:', e));
+            } catch (e) {
+              console.log('Audio creation failed:', e);
+            }
           }
         }
       });
