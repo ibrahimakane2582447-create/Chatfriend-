@@ -1,19 +1,35 @@
-import React, { useState } from 'react';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Phone, Mail } from 'lucide-react';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
+  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [gender, setGender] = useState('other');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
+
+  useEffect(() => {
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible',
+        'callback': (response: any) => {
+          // reCAPTCHA solved, allow signInWithPhoneNumber.
+        }
+      });
+    }
+  }, []);
 
   const generateSearchId = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -24,7 +40,56 @@ export default function Auth() {
     return result;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      if (!confirmationResult) {
+        // Step 1: Send SMS
+        const appVerifier = window.recaptchaVerifier;
+        const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+        const confirmation = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+        setConfirmationResult(confirmation);
+      } else {
+        // Step 2: Verify Code
+        const result = await confirmationResult.confirm(verificationCode);
+        const user = result.user;
+        
+        // Check if user exists, if not create profile
+        const docRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        
+        if (!docSnap.exists()) {
+          const searchId = generateSearchId();
+          await setDoc(docRef, {
+            uid: user.uid,
+            email: user.email || '',
+            phoneNumber: user.phoneNumber,
+            firstName: firstName || 'Utilisateur',
+            lastName: lastName || '',
+            gender,
+            searchId,
+            createdAt: new Date().toISOString(),
+            theme: 'dark'
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error("Phone Auth error:", err);
+      setError('Erreur lors de l\'authentification par téléphone. Vérifiez le numéro ou le code.');
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.render().then((widgetId: any) => {
+          window.grecaptcha.reset(widgetId);
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -54,7 +119,6 @@ export default function Auth() {
       }
     } catch (err: any) {
       console.error("Auth error:", err);
-      // Personnalisation du message d'erreur comme demandé
       if (err.code === 'auth/too-many-requests' || err.code === 'auth/network-request-failed') {
         setError('Veuillez attendre un moment et réessayer.');
       } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
@@ -102,7 +166,22 @@ export default function Auth() {
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <div className="flex justify-center gap-4 mb-6">
+          <button
+            onClick={() => { setAuthMethod('email'); setError(''); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${authMethod === 'email' ? 'bg-white text-black' : 'bg-gray-900 text-gray-400 hover:text-white'}`}
+          >
+            <Mail className="w-4 h-4" /> E-mail
+          </button>
+          <button
+            onClick={() => { setAuthMethod('phone'); setError(''); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${authMethod === 'phone' ? 'bg-white text-black' : 'bg-gray-900 text-gray-400 hover:text-white'}`}
+          >
+            <Phone className="w-4 h-4" /> Téléphone
+          </button>
+        </div>
+
+        <form className="space-y-6" onSubmit={authMethod === 'email' ? handleEmailSubmit : handlePhoneSubmit}>
           {error && (
             <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded-lg text-sm">
               {error}
@@ -148,27 +227,59 @@ export default function Auth() {
               </>
             )}
             
-            <div>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all"
-                placeholder="Adresse e-mail"
-              />
-            </div>
-            
-            <div>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all"
-                placeholder="Mot de passe"
-              />
-            </div>
+            {authMethod === 'email' ? (
+              <>
+                <div>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all"
+                    placeholder="Adresse e-mail"
+                  />
+                </div>
+                
+                <div>
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all"
+                    placeholder="Mot de passe"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                {!confirmationResult ? (
+                  <div>
+                    <input
+                      type="tel"
+                      required
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all"
+                      placeholder="Numéro de téléphone (ex: +33612345678)"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      type="text"
+                      required
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl focus:ring-2 focus:ring-white focus:border-transparent outline-none transition-all text-center tracking-widest text-lg"
+                      placeholder="Code à 6 chiffres"
+                      maxLength={6}
+                    />
+                  </div>
+                )}
+                <div id="recaptcha-container"></div>
+              </>
+            )}
           </div>
 
           <button
@@ -176,7 +287,10 @@ export default function Auth() {
             disabled={loading}
             className="w-full py-3 px-4 bg-white text-black hover:bg-gray-200 disabled:opacity-50 rounded-full font-semibold transition-colors"
           >
-            {loading ? 'Chargement...' : (isLogin ? 'Se connecter' : "S'inscrire")}
+            {loading ? 'Chargement...' : (
+              authMethod === 'phone' && confirmationResult ? 'Vérifier le code' :
+              isLogin ? 'Se connecter' : "S'inscrire"
+            )}
           </button>
         </form>
 

@@ -72,7 +72,7 @@ export default function ChatList() {
         if (currentUnread > previousUnread && currentUnread > 0) {
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification(`Nouveau message de ${chat.otherUser.firstName}`, {
-              body: chat.lastMessage || 'Nouveau message',
+              body: decryptMessage(chat.lastMessage || 'Nouveau message', chat.id),
               icon: '/pwa-192x192.svg'
             });
             
@@ -175,7 +175,7 @@ export default function ChatList() {
                 </div>
                 <div className="flex justify-between items-center mt-0.5">
                   <p className={cn("text-sm truncate", chat.unreadCount?.[user?.uid || ''] ? "text-slate-900 font-semibold" : "text-slate-500")}>
-                    {chat.lastMessage || 'Nouvelle discussion'}
+                    {decryptMessage(chat.lastMessage || 'Nouvelle discussion', chat.id)}
                   </p>
                   {chat.unreadCount?.[user?.uid || ''] > 0 && (
                     <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full ml-2 shrink-0">
