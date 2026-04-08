@@ -13,6 +13,7 @@ interface UserProfile {
   address?: string;
   theme?: string;
   photoUrl?: string;
+  notificationSound?: string;
 }
 
 interface AuthContextType {

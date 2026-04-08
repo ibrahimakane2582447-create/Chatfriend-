@@ -14,10 +14,13 @@ export default function Profile() {
   const [theme, setTheme] = useState(profile?.theme || 'dark');
   const [searchId, setSearchId] = useState(profile?.searchId || '');
   const [photoUrl, setPhotoUrl] = useState(profile?.photoUrl || '');
+  const [notificationSound, setNotificationSound] = useState(profile?.notificationSound || 'default');
   const [saving, setSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingSound, setIsUploadingSound] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const soundInputRef = useRef<HTMLInputElement>(null);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [password, setPassword] = useState('');
@@ -106,6 +109,38 @@ export default function Profile() {
     }
   };
 
+  const handleSoundChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && user) {
+      const file = e.target.files[0];
+      setIsUploadingSound(true);
+      setMessage({ text: '', type: '' });
+
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `sounds/${user.uid}_${Date.now()}.${fileExt}`;
+        const storageRef = ref(storage, fileName);
+        
+        await uploadBytes(storageRef, file);
+        const downloadUrl = await getDownloadURL(storageRef);
+        
+        setNotificationSound(downloadUrl);
+        
+        // Auto-save the new sound URL to Firestore
+        await updateDoc(doc(db, 'users', user.uid), {
+          notificationSound: downloadUrl
+        });
+        
+        setMessage({ text: 'Son de notification mis à jour.', type: 'success' });
+      } catch (error) {
+        console.error("Error uploading sound:", error);
+        setMessage({ text: 'Erreur lors du téléchargement du son.', type: 'error' });
+      } finally {
+        setIsUploadingSound(false);
+        setTimeout(() => setMessage({ text: '', type: '' }), 3000);
+      }
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
@@ -127,7 +162,8 @@ export default function Profile() {
         address,
         theme,
         searchId,
-        photoUrl
+        photoUrl,
+        notificationSound
       });
       setMessage({ text: 'Profil mis à jour avec succès.', type: 'success' });
     } catch (error) {
@@ -284,6 +320,56 @@ export default function Profile() {
                   </button>
                 )}
               </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
+                <Bell className="w-4 h-4" />
+                Son de notification
+              </label>
+              <div className="flex gap-2 items-center">
+                <select
+                  value={notificationSound.startsWith('http') ? 'custom' : notificationSound}
+                  onChange={(e) => {
+                    if (e.target.value !== 'custom') {
+                      setNotificationSound(e.target.value);
+                    } else {
+                      soundInputRef.current?.click();
+                    }
+                  }}
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900"
+                >
+                  <option value="default">Défaut</option>
+                  <option value="bell">Clochette</option>
+                  <option value="chime">Carillon</option>
+                  {notificationSound.startsWith('http') && <option value="custom">Son personnalisé</option>}
+                  {!notificationSound.startsWith('http') && <option value="custom">Importer un son...</option>}
+                </select>
+                <button 
+                  onClick={() => {
+                    const soundUrl = notificationSound === 'default' ? 'https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3' :
+                                     notificationSound === 'bell' ? 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' :
+                                     notificationSound === 'chime' ? 'https://assets.mixkit.co/active_storage/sfx/2866/2866-preview.mp3' :
+                                     notificationSound;
+                    const audio = new Audio(soundUrl);
+                    audio.play().catch(e => console.log('Audio play failed:', e));
+                  }}
+                  className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors"
+                  title="Jouer le son"
+                >
+                  <BellRing className="w-5 h-5" />
+                </button>
+              </div>
+              <input 
+                type="file" 
+                ref={soundInputRef} 
+                onChange={handleSoundChange} 
+                accept="audio/*" 
+                className="hidden" 
+              />
+              {isUploadingSound && (
+                <p className="text-xs text-blue-600 mt-2 animate-pulse">Téléchargement du son en cours...</p>
+              )}
             </div>
 
             {message.text && (

@@ -78,7 +78,12 @@ export default function ChatList() {
             
             // Play notification sound
             try {
-              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
+              const soundPref = profile?.notificationSound || 'default';
+              const soundUrl = soundPref === 'default' ? 'https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3' :
+                               soundPref === 'bell' ? 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' :
+                               soundPref === 'chime' ? 'https://assets.mixkit.co/active_storage/sfx/2866/2866-preview.mp3' :
+                               soundPref;
+              const audio = new Audio(soundUrl);
               audio.play().catch(e => console.log('Audio play failed:', e));
             } catch (e) {
               console.log('Audio creation failed:', e);

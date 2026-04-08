@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot, addDoc, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, getDocs, doc, getDoc, deleteDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { useAuth } from '../context/AuthContext';
-import { Plus, X, Image as ImageIcon, Video, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
+import { Plus, X, Image as ImageIcon, Video, ChevronLeft, ChevronRight, Upload, Trash2 } from 'lucide-react';
 
 export default function MyDay() {
   const { user, profile } = useAuth();
@@ -16,6 +16,9 @@ export default function MyDay() {
   
   // Add Story State
   const [adding, setAdding] = useState(false);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [caption, setCaption] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -96,39 +99,61 @@ export default function MyDay() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0] && user) {
       const file = e.target.files[0];
-      const type = file.type.startsWith('video/') ? 'video' : 'image';
+      setPreviewFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+      setCaption('');
+      setShowAddModal(true);
+    }
+  };
+
+  const handleUploadStory = async () => {
+    if (!previewFile || !user) return;
+    
+    setAdding(true);
+    const type = previewFile.type.startsWith('video/') ? 'video' : 'image';
+
+    try {
+      // 1. Upload file to Firebase Storage
+      const fileExt = previewFile.name.split('.').pop();
+      const fileName = `stories/${user.uid}_${Date.now()}.${fileExt}`;
+      const storageRef = ref(storage, fileName);
       
-      setAdding(true);
-      setShowAddModal(true); // Show loading state
+      await uploadBytes(storageRef, previewFile);
+      const downloadUrl = await getDownloadURL(storageRef);
 
-      try {
-        // 1. Upload file to Firebase Storage
-        const fileExt = file.name.split('.').pop();
-        const fileName = `stories/${user.uid}_${Date.now()}.${fileExt}`;
-        const storageRef = ref(storage, fileName);
-        
-        await uploadBytes(storageRef, file);
-        const downloadUrl = await getDownloadURL(storageRef);
+      // 2. Save to Firestore
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // +24 hours
 
-        // 2. Save to Firestore
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // +24 hours
+      await addDoc(collection(db, 'stories'), {
+        userId: user.uid,
+        mediaUrl: downloadUrl,
+        mediaType: type,
+        caption: caption.trim(),
+        createdAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString()
+      });
 
-        await addDoc(collection(db, 'stories'), {
-          userId: user.uid,
-          mediaUrl: downloadUrl,
-          mediaType: type,
-          createdAt: now.toISOString(),
-          expiresAt: expiresAt.toISOString()
-        });
+    } catch (error: any) {
+      console.error("Error adding story:", error);
+      alert("Erreur lors de l'ajout de la story.");
+    } finally {
+      setAdding(false);
+      setShowAddModal(false);
+      setPreviewFile(null);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+  };
 
-      } catch (error: any) {
-        console.error("Error adding story:", error);
-        alert("Erreur lors de l'ajout de la story.");
-      } finally {
-        setAdding(false);
-        setShowAddModal(false);
-      }
+  const markAsViewed = async (storyId: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'stories', storyId), {
+        viewedBy: arrayUnion(user.uid)
+      });
+    } catch (error) {
+      console.error("Error marking story as viewed:", error);
     }
   };
 
@@ -136,15 +161,31 @@ export default function MyDay() {
     setCurrentViewIndex(groupIndex);
     setCurrentStoryIndex(0);
     setShowViewModal(true);
+    
+    // Mark first story as viewed
+    const firstStory = groupedStories[groupIndex].stories[0];
+    if (firstStory && !firstStory.viewedBy?.includes(user?.uid)) {
+      markAsViewed(firstStory.id);
+    }
   };
 
   const handleNextStory = () => {
     const currentGroup = groupedStories[currentViewIndex];
     if (currentStoryIndex < currentGroup.stories.length - 1) {
-      setCurrentStoryIndex(prev => prev + 1);
+      const nextIndex = currentStoryIndex + 1;
+      setCurrentStoryIndex(nextIndex);
+      const nextStory = currentGroup.stories[nextIndex];
+      if (nextStory && !nextStory.viewedBy?.includes(user?.uid)) {
+        markAsViewed(nextStory.id);
+      }
     } else if (currentViewIndex < groupedStories.length - 1) {
-      setCurrentViewIndex(prev => prev + 1);
+      const nextGroupIndex = currentViewIndex + 1;
+      setCurrentViewIndex(nextGroupIndex);
       setCurrentStoryIndex(0);
+      const nextStory = groupedStories[nextGroupIndex].stories[0];
+      if (nextStory && !nextStory.viewedBy?.includes(user?.uid)) {
+        markAsViewed(nextStory.id);
+      }
     } else {
       setShowViewModal(false);
     }
@@ -156,6 +197,22 @@ export default function MyDay() {
     } else if (currentViewIndex > 0) {
       setCurrentViewIndex(prev => prev - 1);
       setCurrentStoryIndex(groupedStories[currentViewIndex - 1].stories.length - 1);
+    }
+  };
+
+  const handleDeleteStory = async (storyId: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'stories', storyId));
+      // If it was the last story in the group, close modal
+      const currentGroup = groupedStories[currentViewIndex];
+      if (currentGroup.stories.length === 1) {
+        setShowViewModal(false);
+      } else {
+        handleNextStory();
+      }
+    } catch (error) {
+      console.error("Error deleting story:", error);
     }
   };
 
@@ -195,22 +252,27 @@ export default function MyDay() {
         />
 
         {/* Stories List */}
-        {groupedStories.map((group, index) => (
-          <div key={group.userId} className="flex flex-col items-center gap-1 shrink-0 cursor-pointer" onClick={() => openStory(index)}>
-            <div className={`w-16 h-16 rounded-full p-[2px] ${group.userId === user?.uid ? 'bg-slate-300' : 'bg-blue-600'}`}>
-              <div className="w-full h-full rounded-full overflow-hidden bg-blue-100 flex items-center justify-center text-xl font-bold text-blue-700">
-                {group.userProfile?.photoUrl ? (
-                  <img src={group.userProfile.photoUrl} alt={group.userProfile.firstName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <>{group.userProfile?.firstName.charAt(0)}{group.userProfile?.lastName.charAt(0)}</>
-                )}
+        {groupedStories.map((group, index) => {
+          const allViewed = group.stories.every((s: any) => s.viewedBy?.includes(user?.uid));
+          const ringColor = group.userId === user?.uid ? 'bg-slate-300' : allViewed ? 'bg-slate-300' : 'bg-blue-600';
+          
+          return (
+            <div key={group.userId} className="flex flex-col items-center gap-1 shrink-0 cursor-pointer" onClick={() => openStory(index)}>
+              <div className={`w-16 h-16 rounded-full p-[2px] ${ringColor}`}>
+                <div className="w-full h-full rounded-full overflow-hidden bg-blue-100 flex items-center justify-center text-xl font-bold text-blue-700">
+                  {group.userProfile?.photoUrl ? (
+                    <img src={group.userProfile.photoUrl} alt={group.userProfile.firstName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <>{group.userProfile?.firstName.charAt(0)}{group.userProfile?.lastName.charAt(0)}</>
+                  )}
+                </div>
               </div>
+              <span className="text-xs text-slate-700 font-medium truncate w-16 text-center">
+                {group.userId === user?.uid ? 'Mon statut' : group.userProfile?.firstName}
+              </span>
             </div>
-            <span className="text-xs text-slate-700 font-medium truncate w-16 text-center">
-              {group.userId === user?.uid ? 'Mon statut' : group.userProfile?.firstName}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* View Story Modal */}
@@ -244,9 +306,19 @@ export default function MyDay() {
                 {groupedStories[currentViewIndex].userProfile?.firstName} {groupedStories[currentViewIndex].userProfile?.lastName}
               </span>
             </div>
-            <button onClick={() => setShowViewModal(false)} className="p-2 text-white drop-shadow-md">
-              <X className="w-8 h-8" />
-            </button>
+            <div className="flex items-center gap-2">
+              {groupedStories[currentViewIndex].userId === user?.uid && (
+                <button 
+                  onClick={() => handleDeleteStory(groupedStories[currentViewIndex].stories[currentStoryIndex].id)} 
+                  className="p-2 text-white drop-shadow-md hover:text-red-500 transition-colors"
+                >
+                  <Trash2 className="w-6 h-6" />
+                </button>
+              )}
+              <button onClick={() => setShowViewModal(false)} className="p-2 text-white drop-shadow-md">
+                <X className="w-8 h-8" />
+              </button>
+            </div>
           </div>
 
           {/* Media Content */}
@@ -268,11 +340,60 @@ export default function MyDay() {
               />
             )}
 
+            {groupedStories[currentViewIndex].stories[currentStoryIndex].caption && (
+              <div className="absolute bottom-10 left-0 right-0 text-center px-4 z-20">
+                <span className="bg-black/50 text-white px-4 py-2 rounded-xl text-sm inline-block">
+                  {groupedStories[currentViewIndex].stories[currentStoryIndex].caption}
+                </span>
+              </div>
+            )}
+
             {/* Navigation Overlays */}
-            <div className="absolute inset-0 flex">
+            <div className="absolute inset-0 flex z-10">
               <div className="w-1/3 h-full" onClick={handlePrevStory} />
               <div className="w-2/3 h-full" onClick={handleNextStory} />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Add Modal */}
+      {showAddModal && previewUrl && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          <div className="absolute top-4 right-4 z-10">
+            <button onClick={() => {
+              setShowAddModal(false);
+              setPreviewFile(null);
+              URL.revokeObjectURL(previewUrl);
+              setPreviewUrl(null);
+            }} className="p-2 text-white drop-shadow-md bg-black/50 rounded-full">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+          
+          <div className="flex-1 relative flex items-center justify-center bg-black">
+            {previewFile?.type.startsWith('video/') ? (
+              <video src={previewUrl} className="w-full h-full object-contain" autoPlay loop playsInline />
+            ) : (
+              <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
+            )}
+          </div>
+          
+          <div className="p-4 bg-black/80 flex items-center gap-2">
+            <input 
+              type="text" 
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="Ajouter une légende..."
+              className="flex-1 bg-gray-800 text-white rounded-full px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button 
+              onClick={handleUploadStory}
+              disabled={adding}
+              className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50"
+            >
+              {adding ? <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-white"></div> : <Upload className="w-6 h-6" />}
+            </button>
           </div>
         </div>
       )}
