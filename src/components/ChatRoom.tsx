@@ -210,7 +210,8 @@ export default function ChatRoom() {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const mimeType = mediaRecorder.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         stream.getTracks().forEach(track => track.stop());
         setRecordingTime(0);
         
@@ -249,7 +250,8 @@ export default function ChatRoom() {
     if (!recordedAudio || !user || !chatId) return;
     setUploading(true);
     try {
-      const fileName = `chats/${chatId}/audio_${Date.now()}.webm`;
+      const fileExt = recordedAudio.blob.type.split('/')[1]?.split(';')[0] || 'webm';
+      const fileName = `chats/${chatId}/audio_${Date.now()}.${fileExt}`;
       const storageRef = ref(storage, fileName);
       await uploadBytes(storageRef, recordedAudio.blob);
       const downloadUrl = await getDownloadURL(storageRef);
@@ -265,7 +267,7 @@ export default function ChatRoom() {
       });
 
       await updateDoc(doc(db, 'chats', chatId), {
-        lastMessage: '🎤 Message vocal',
+        lastMessage: encryptMessage('🎤 Message vocal', chatId),
         lastMessageAt: now,
         lastMessageSenderId: user.uid,
         [`unreadCount.${otherUser?.uid || 'unknown'}`]: 1
@@ -342,8 +344,9 @@ export default function ChatRoom() {
         createdAt: now
       });
 
+      const lastMsgText = isViewOnce ? '📷 Vue unique' : (type === 'image' ? '📷 Image' : '🎥 Vidéo');
       await updateDoc(doc(db, 'chats', chatId), {
-        lastMessage: isViewOnce ? '📷 Vue unique' : (type === 'image' ? '📷 Image' : '🎥 Vidéo'),
+        lastMessage: encryptMessage(lastMsgText, chatId),
         lastMessageAt: now,
         lastMessageSenderId: user.uid,
         [`unreadCount.${otherUser?.uid || 'unknown'}`]: 1

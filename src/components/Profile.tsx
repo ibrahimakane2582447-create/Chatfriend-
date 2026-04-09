@@ -4,12 +4,14 @@ import { auth, db, storage } from '../firebase';
 import { signOut, EmailAuthProvider, reauthenticateWithCredential, deleteUser } from 'firebase/auth';
 import { doc, updateDoc, deleteDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { LogOut, Save, MapPin, Palette, Hash, Image as ImageIcon, AlertTriangle, X, Camera, Download, Bell, BellRing, BellOff } from 'lucide-react';
+import { LogOut, Save, MapPin, Palette, Hash, Image as ImageIcon, AlertTriangle, X, Camera, Download, Bell, BellRing, BellOff, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Profile() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const [firstName, setFirstName] = useState(profile?.firstName || '');
+  const [lastName, setLastName] = useState(profile?.lastName || '');
   const [address, setAddress] = useState(profile?.address || '');
   const [theme, setTheme] = useState(profile?.theme || 'dark');
   const [searchId, setSearchId] = useState(profile?.searchId || '');
@@ -159,6 +161,8 @@ export default function Profile() {
       }
 
       await updateDoc(doc(db, 'users', user.uid), {
+        firstName,
+        lastName,
         address,
         theme,
         searchId,
@@ -254,6 +258,34 @@ export default function Profile() {
         <div className="space-y-6">
           {/* Settings Form */}
           <div className="bg-white p-4 rounded-2xl space-y-4 shadow-sm border border-slate-100">
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
+                <User className="w-4 h-4" />
+                Prénom
+              </label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Votre prénom"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900"
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
+                <User className="w-4 h-4" />
+                Nom
+              </label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Votre nom"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900"
+              />
+            </div>
+
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
                 <Hash className="w-4 h-4" />

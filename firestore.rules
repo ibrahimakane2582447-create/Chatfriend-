@@ -93,7 +93,9 @@ service cloud.firestore {
              validStringLength('mediaUrl', 1, 1000) &&
              data.mediaType in ['image', 'video'] &&
              data.createdAt is string &&
-             data.expiresAt is string;
+             data.expiresAt is string &&
+             (!( 'caption' in data ) || data.caption is string) &&
+             (!( 'viewedBy' in data ) || data.viewedBy is list);
     }
 
     // ===============================================================
@@ -142,7 +144,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidStory();
       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow update: if false;
+      allow update: if isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedBy']);
     }
   }
 }
